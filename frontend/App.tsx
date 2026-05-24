@@ -5,8 +5,8 @@ import { auth, ensureUserDocument, getUserChatHistory, saveChatSession } from '.
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
-import { SuggestedPrompts } from './components/SuggestedPrompts';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, AppView } from './components/Sidebar';
+import { SoreaVoice } from './components/SoreaVoice';
 import { AuthModal, AuthMode } from './components/AuthModal';
 import { Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
 
@@ -16,17 +16,73 @@ const THINKING_STEPS = [
   'Menyusun jawaban',
 ];
 
+const IMAGE_GENERATION_STEPS = [
+  'Membaca prompt gambar',
+  'Menyusun komposisi visual',
+  'Merender gambar',
+];
+
+const IMAGE_ANALYSIS_STEPS = [
+  'Memeriksa gambar',
+  'Mengenali detail visual',
+  'Menyusun analisis gambar',
+];
+
+const FILE_ANALYSIS_STEPS = [
+  'Membaca file',
+  'Mengambil poin penting',
+  'Menyusun analisis file',
+];
+
+const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09';
+
+const IMAGE_GENERATION_KEYWORDS = [
+  'buat gambar',
+  'buatkan gambar',
+  'generate gambar',
+  'hasilkan gambar',
+  'bikin gambar',
+  'gambar',
+  'ilustrasi',
+  'poster',
+  'logo',
+  'desain',
+  'render',
+  'draw',
+  'generate image',
+  'create image',
+];
+
+const getThinkingSteps = (text: string, attachments: Attachment[]) => {
+  if (attachments.some((attachment) => attachment.mimeType.startsWith('image/'))) {
+    return IMAGE_ANALYSIS_STEPS;
+  }
+
+  if (attachments.length > 0) {
+    return FILE_ANALYSIS_STEPS;
+  }
+
+  const normalizedText = text.toLowerCase();
+  if (IMAGE_GENERATION_KEYWORDS.some((keyword) => normalizedText.includes(keyword))) {
+    return IMAGE_GENERATION_STEPS;
+  }
+
+  return THINKING_STEPS;
+};
+
 const App: React.FC = () => {
   // Chat State
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [thinkingStep, setThinkingStep] = useState(0);
+  const [activeThinkingSteps, setActiveThinkingSteps] = useState(THINKING_STEPS);
   const [error, setError] = useState<string | null>(null);
   
   // History State
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<AppView>('chat');
   
   // Auth State
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -90,11 +146,11 @@ const App: React.FC = () => {
     }
 
     const timer = window.setInterval(() => {
-      setThinkingStep((step) => (step + 1) % THINKING_STEPS.length);
+      setThinkingStep((step) => (step + 1) % activeThinkingSteps.length);
     }, 1600);
 
     return () => window.clearInterval(timer);
-  }, [isLoading]);
+  }, [activeThinkingSteps, isLoading]);
 
   const loadHistory = async (uid: string) => {
     try {
@@ -140,6 +196,7 @@ const App: React.FC = () => {
 
     const updatedMessagesAfterUser = [...messages, newUserMessage];
     isSendingRef.current = true;
+    setActiveThinkingSteps(getThinkingSteps(text, attachments));
     setMessages(updatedMessagesAfterUser);
     setIsLoading(true);
     setError(null);
@@ -207,6 +264,7 @@ const App: React.FC = () => {
 
   const handleNewChat = () => {
     geminiService.resetChat();
+    setActiveView('chat');
     setMessages([]);
     setCurrentSessionId(null);
     setError(null);
@@ -215,8 +273,15 @@ const App: React.FC = () => {
 
   const handleSelectSession = (session: ChatSession) => {
     geminiService.resetChat(); // Reset context for new session
+    setActiveView('chat');
     setMessages(session.messages);
     setCurrentSessionId(session.id);
+    setError(null);
+    setIsSidebarOpen(false);
+  };
+
+  const handleOpenVoice = () => {
+    setActiveView('voice');
     setError(null);
     setIsSidebarOpen(false);
   };
@@ -227,14 +292,19 @@ const App: React.FC = () => {
     handleNewChat();
   };
 
+  const isEmptyChat = messages.length === 0;
+  const username = user?.email?.split('@')[0] ?? '';
+
   return (
-    <div className="flex h-[var(--app-height,100dvh)] w-full bg-white font-sans overflow-hidden">
+    <div className="flex h-[var(--app-height,100dvh)] w-full overflow-hidden bg-white font-sans">
       
       {/* Sidebar */}
       <Sidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         onNewChat={handleNewChat}
+        onOpenVoice={handleOpenVoice}
+        activeView={activeView}
         history={chatHistory}
         currentSessionId={currentSessionId}
         onSelectSession={handleSelectSession}
@@ -245,11 +315,17 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col h-full min-h-0 relative min-w-0">
         
         {/* Header */}
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100/70 bg-white/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md md:px-6 md:pb-4 md:pt-[calc(env(safe-area-inset-top)+1rem)]">
+        <header className={`sticky top-0 z-10 flex items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md md:px-6 md:pb-4 md:pt-[calc(env(safe-area-inset-top)+1rem)] ${
+          isEmptyChat
+            ? 'border-b border-slate-100/70 bg-white/90'
+            : 'border-b border-slate-100/70 bg-white/90'
+        }`}>
           <div className="flex min-w-0 items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
+              className={`rounded-full p-2 transition-colors ${
+                isEmptyChat ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-600 hover:bg-slate-100'
+              }`}
               aria-label="Buka riwayat chat"
             >
               <Menu size={24} />
@@ -259,7 +335,7 @@ const App: React.FC = () => {
               className="min-w-0 flex items-center gap-2 text-left"
               onClick={handleNewChat}
             >
-              <span className="truncate text-lg md:text-xl font-semibold text-slate-600">
+              <span className={`truncate text-lg font-semibold md:text-xl ${isEmptyChat ? 'text-slate-600' : 'text-slate-600'}`}>
                 PUTRA AI PLUS
               </span>
               <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold leading-4 text-blue-700">
@@ -275,7 +351,7 @@ const App: React.FC = () => {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-medium shadow-sm hover:bg-blue-700 transition-colors"
                 >
-                  {user.email ? user.email.charAt(0).toUpperCase() : <UserIcon size={18} />}
+                  {username ? username.charAt(0).toUpperCase() : <UserIcon size={18} />}
                 </button>
                 
                 {/* User Dropdown Menu */}
@@ -299,22 +375,58 @@ const App: React.FC = () => {
         </header>
 
         {/* Chat Area */}
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-48 md:pb-44">
-          {messages.length === 0 ? (
+        {activeView === 'voice' ? (
+          <SoreaVoice
+            isLoggedIn={!!user}
+            onRequireLogin={() => {
+              setAuthMode('login');
+              setError('Silakan masuk atau buat akun sebelum menggunakan Sorea Voice.');
+            }}
+          />
+        ) : (
+        <main className={`relative flex-1 min-h-0 overflow-y-auto overscroll-contain ${isEmptyChat ? '' : 'pb-48 md:pb-44'}`}>
+          {isEmptyChat ? (
             // Empty State / Greeting
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 md:pt-16 flex min-h-full flex-col">
-              <div className="mb-8 md:mb-10 max-w-3xl">
-                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-red-500 text-white shadow-sm">
-                  <Sparkles size={20} className="fill-white" />
+            <div className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.18) 0%, rgba(147, 197, 253, 0.12) 28%, rgba(255, 255, 255, 0.78) 58%, #ffffff 100%)',
+                }}
+              />
+              <div className="relative z-10 flex w-full max-w-[660px] -translate-y-10 flex-col items-center gap-8 sm:-translate-y-6">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100">
+                    <img
+                      src={APP_ICON_URL}
+                      alt="PUTRA AI STUDIO"
+                      className="h-9 w-9 object-contain"
+                    />
+                  </div>
+                  <h2 className="text-[28px] font-medium leading-tight tracking-normal text-slate-700 sm:text-4xl">
+                    Sebaiknya kita mulai dari mana?
+                  </h2>
+                  {username && (
+                    <p className="max-w-[80vw] truncate bg-gradient-to-r from-blue-600 via-violet-500 to-rose-500 bg-clip-text text-xl font-semibold leading-tight text-transparent sm:text-2xl">
+                      {username}
+                    </p>
+                  )}
                 </div>
-                <h2 className="text-4xl md:text-6xl font-semibold tracking-normal leading-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-violet-500 to-rose-500">
-                  Halo.
-                </h2>
-                <h2 className="text-3xl md:text-5xl font-semibold tracking-normal leading-tight text-slate-400">
-                  Apa yang ingin Anda buat atau bahas hari ini?
-                </h2>
+                <div className="w-full">
+                  <ChatInput
+                    onSendMessage={handleSendMessage}
+                    isLoading={isLoading || !user}
+                    variant="hero"
+                    placeholder="Minta PUTRA AI"
+                  />
+                  {error && (
+                    <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-sm text-red-100">
+                      {error}
+                    </div>
+                  )}
+                </div>
               </div>
-              <SuggestedPrompts onSelectPrompt={(text) => handleSendMessage(text, [])} disabled={isLoading || !user} />
             </div>
           ) : (
             // Messages List
@@ -327,19 +439,23 @@ const App: React.FC = () => {
                 <div className="flex w-full mb-8 justify-start">
                   <div className="flex max-w-[90%] flex-row items-start gap-4">
                     <div className="flex-shrink-0 mt-1">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-red-500 flex items-center justify-center text-white shadow-sm animate-pulse">
-                        <Sparkles size={16} className="fill-white" />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100 animate-pulse">
+                        <img
+                          src={APP_ICON_URL}
+                          alt="PUTRA AI STUDIO"
+                          className="h-6 w-6 object-contain"
+                        />
                       </div>
                     </div>
                     <div className="flex-1 py-1.5">
-                      <div className="inline-flex items-center gap-3 rounded-full bg-slate-50 px-3.5 py-2 text-slate-600 shadow-sm ring-1 ring-slate-200/70">
+                      <div className="inline-flex items-center gap-3 px-1 py-2 text-slate-600">
                         <div className="flex items-center gap-1.5" aria-hidden="true">
                           <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }}></span>
                           <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }}></span>
                           <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: '300ms' }}></span>
                         </div>
                         <span className="text-sm font-medium">
-                          {THINKING_STEPS[thinkingStep]}
+                          {activeThinkingSteps[thinkingStep]}
                         </span>
                       </div>
                     </div>
@@ -357,8 +473,10 @@ const App: React.FC = () => {
             </div>
           )}
         </main>
+        )}
 
         {/* Input Area Fixed at Bottom */}
+        {activeView === 'chat' && !isEmptyChat && (
         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 md:px-6">
           <div className="max-w-3xl mx-auto">
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !user} />
@@ -375,6 +493,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
       </div>
 

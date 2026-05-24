@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { User, getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { getFirestore, doc, setDoc, collection, getDocs, query, orderBy, writeBatch, Timestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { ChatSession, Message } from "../types";
 
@@ -22,6 +22,20 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // --- Firestore Helpers ---
+
+const CHAT_RETENTION_DAYS = 90;
+
+const getChatExpiryDate = (date = new Date()) => {
+  const expiryDate = new Date(date);
+  expiryDate.setDate(expiryDate.getDate() + CHAT_RETENTION_DAYS);
+  return expiryDate;
+};
+
+const getChatRetentionCutoff = () => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - CHAT_RETENTION_DAYS);
+  return cutoffDate;
+};
 
 export const ensureUserDocument = async (user: User) => {
   try {
@@ -83,6 +97,7 @@ export const saveChatSession = async (userId: string, sessionId: string, title: 
       title,
       createdAt: sessionCreatedAt,
       updatedAt: now,
+      expiresAt: Timestamp.fromDate(getChatExpiryDate()),
       messageCount: serializedMessages.length,
       lastMessage: serializedMessages[serializedMessages.length - 1]?.text?.slice(0, 240) || '',
       messages: serializedMessages
@@ -100,8 +115,19 @@ export const getUserChatHistory = async (userId: string): Promise<ChatSession[]>
     const querySnapshot = await getDocs(q);
     
     const history: ChatSession[] = [];
+    const expiredBatch = writeBatch(db);
+    let expiredCount = 0;
+    const retentionCutoff = getChatRetentionCutoff();
+
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      const updatedAt = data.updatedAt ? new Date(data.updatedAt) : null;
+
+      if (!updatedAt || updatedAt < retentionCutoff) {
+        expiredBatch.delete(doc.ref);
+        expiredCount += 1;
+        return;
+      }
       
       // Deserialize ISO strings back to Date objects
       const deserializedMessages = (data.messages || []).map((msg: any) => ({
@@ -116,6 +142,10 @@ export const getUserChatHistory = async (userId: string): Promise<ChatSession[]>
         messages: deserializedMessages
       });
     });
+
+    if (expiredCount > 0) {
+      await expiredBatch.commit();
+    }
     
     return history;
   } catch (error) {

@@ -1,11 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, KeyRound, MessageSquare, Package, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, KeyRound, MessageSquare, Mic2, Package, Plus, X } from 'lucide-react';
 import { ChatSession } from '../types';
+
+export type AppView = 'chat' | 'voice';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onNewChat: () => void;
+  onOpenVoice: () => void;
+  activeView: AppView;
   history: ChatSession[];
   currentSessionId: string | null;
   onSelectSession: (session: ChatSession) => void;
@@ -16,6 +20,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen, 
   onClose, 
   onNewChat, 
+  onOpenVoice,
+  activeView,
   history, 
   currentSessionId, 
   onSelectSession,
@@ -82,6 +88,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </a>
                 );
               })}
+              <button
+                type="button"
+                onClick={onOpenVoice}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
+                  activeView === 'voice'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'text-slate-700 hover:bg-slate-200/70'
+                }`}
+              >
+                <Mic2 size={16} className="flex-shrink-0 opacity-75" />
+                <span className="text-sm font-medium truncate">Sorea Voice</span>
+              </button>
             </div>
           </div>
 

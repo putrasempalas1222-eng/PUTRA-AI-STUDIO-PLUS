@@ -1,24 +1,62 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Plus, Image as ImageIcon, Mic, X, FileText, File, Music, Square } from 'lucide-react';
+import { Send, Plus, Image as ImageIcon, Mic, X, FileText, File, Square } from 'lucide-react';
 import { Attachment } from '../types';
+
+type SpeechRecognitionConstructor = new () => SpeechRecognition;
+
+interface SpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+}
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 interface ChatInputProps {
   onSendMessage: (message: string, attachments: Attachment[]) => void;
   isLoading: boolean;
+  variant?: 'default' | 'hero';
+  placeholder?: string;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({
+  onSendMessage,
+  isLoading,
+  variant = 'default',
+  placeholder = 'Tulis pesan di sini',
+}) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const isHero = variant === 'hero';
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timerRef = useRef<number | null>(null);
 
   // Auto-resize textarea
@@ -33,9 +71,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
   useEffect(() => {
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
+      recognitionRef.current?.abort();
     };
   }, []);
 
@@ -81,49 +117,62 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
   };
 
   const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
+    const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const base64Data = await fileToBase64(audioBlob);
-        
-        setAttachments(prev => [...prev, {
-          id: Date.now().toString(),
-          name: `Pesan_Suara_${new Date().toLocaleTimeString().replace(/:/g, '-')}.webm`,
-          mimeType: 'audio/webm',
-          data: base64Data
-        }]);
-        
-        // Stop all tracks to release microphone
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      recorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-      
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-
-    } catch (error) {
-      console.error("Gagal mengakses mikrofon:", error);
-      alert("Tidak dapat mengakses mikrofon. Periksa izin mikrofon Anda.");
+    if (!SpeechRecognitionApi) {
+      alert('Browser ini belum mendukung ubah suara ke teks. Coba gunakan Chrome atau Edge.');
+      return;
     }
+
+    const recognition = new SpeechRecognitionApi();
+    recognition.lang = 'id-ID';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      const finalParts: string[] = [];
+      const interimParts: string[] = [];
+
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0]?.transcript.trim();
+        if (!transcript) continue;
+
+        if (result.isFinal) {
+          finalParts.push(transcript);
+        } else {
+          interimParts.push(transcript);
+        }
+      }
+
+      setVoiceTranscript(finalParts.join(' ').trim());
+      setInterimTranscript(interimParts.join(' ').trim());
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Gagal mengubah suara ke teks:', event.error);
+      setIsRecording(false);
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      setInterimTranscript('');
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    setRecordingTime(0);
+
+    timerRef.current = window.setInterval(() => {
+      setRecordingTime(prev => prev + 1);
+    }, 1000);
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
+    recognitionRef.current?.stop();
     setIsRecording(false);
     if (timerRef.current) window.clearInterval(timerRef.current);
   };
@@ -136,9 +185,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((input.trim() || attachments.length > 0) && !isLoading && !isRecording) {
-      onSendMessage(input.trim(), attachments);
+    const finalText = [input.trim(), voiceTranscript.trim()].filter(Boolean).join('\n\n');
+
+    if ((finalText || attachments.length > 0) && !isLoading && !isRecording) {
+      onSendMessage(finalText, attachments);
       setInput('');
+      setVoiceTranscript('');
+      setInterimTranscript('');
       setAttachments([]);
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -155,7 +208,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.startsWith('image/')) return <ImageIcon size={16} className="text-blue-500" />;
-    if (mimeType.startsWith('audio/')) return <Music size={16} className="text-purple-500" />;
     if (mimeType.includes('pdf')) return <FileText size={16} className="text-red-500" />;
     if (mimeType.includes('word') || mimeType.includes('document')) return <FileText size={16} className="text-blue-600" />;
     if (mimeType.includes('excel') || mimeType.includes('sheet')) return <File size={16} className="text-green-600" />;
@@ -163,7 +215,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
   };
 
   return (
-    <div className="relative flex flex-col bg-[#f0f4f9] rounded-[28px] md:rounded-[32px] shadow-lg shadow-slate-900/5 transition-all focus-within:bg-white focus-within:shadow-[0_8px_24px_rgba(15,23,42,0.08)] focus-within:ring-1 focus-within:ring-gray-200">
+    <div className={`relative flex flex-col rounded-[28px] shadow-lg transition-all md:rounded-[32px] ${
+      isHero
+        ? 'bg-white shadow-slate-900/10 ring-1 ring-slate-200/80 focus-within:bg-white focus-within:ring-blue-200'
+        : 'bg-[#f0f4f9] shadow-slate-900/5 focus-within:bg-white focus-within:shadow-[0_8px_24px_rgba(15,23,42,0.08)] focus-within:ring-1 focus-within:ring-gray-200'
+    }`}>
       
       {/* Hidden File Inputs */}
       <input 
@@ -187,14 +243,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 p-3 pb-0">
           {attachments.map(att => (
-            <div key={att.id} className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl pl-3 pr-1 py-1.5 shadow-sm max-w-[200px]">
+            <div key={att.id} className={`flex max-w-[200px] items-center gap-2 rounded-xl py-1.5 pl-3 pr-1 shadow-sm ${
+              isHero ? 'border border-slate-200 bg-slate-50' : 'border border-slate-200 bg-white'
+            }`}>
               {getFileIcon(att.mimeType)}
-              <span className="text-xs text-slate-700 truncate flex-1">{att.name}</span>
+              <span className={`flex-1 truncate text-xs ${isHero ? 'text-slate-700' : 'text-slate-700'}`}>{att.name}</span>
               <button 
                 type="button" 
                 onClick={() => removeAttachment(att.id)}
                 disabled={isLoading}
-                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                className={`rounded-full p-1 transition-colors ${isHero ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
               >
                 <X size={14} />
               </button>
@@ -208,7 +266,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
         <div className="flex items-center justify-between px-4 py-3 bg-red-50 rounded-t-[32px] border-b border-red-100">
           <div className="flex items-center gap-3">
             <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-red-600">Merekam suara... {formatTime(recordingTime)}</span>
+            <span className="text-sm font-medium text-red-600">Mendengar suara... {formatTime(recordingTime)}</span>
           </div>
           <button 
             type="button" 
@@ -220,6 +278,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
         </div>
       )}
 
+      {(voiceTranscript || interimTranscript) && (
+        <div className="px-4 pt-3">
+          <div className={`rounded-2xl px-3 py-2 text-sm ${
+            isHero ? 'bg-blue-50 text-slate-700' : 'bg-white text-slate-700'
+          }`}>
+            <span className="font-medium text-blue-600">Suara:</span>{' '}
+            <span>{voiceTranscript}</span>
+            {interimTranscript && <span className="text-slate-400"> {interimTranscript}</span>}
+          </div>
+        </div>
+      )}
+
       {/* Input Area */}
       <form onSubmit={handleSubmit} className="flex items-end gap-1.5 md:gap-2 px-2 py-2">
         {/* Left Action Buttons */}
@@ -228,7 +298,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
             type="button" 
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || isRecording}
-            className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50" 
+            className={`rounded-full p-2 transition-colors disabled:opacity-50 ${
+              isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
+            }`}
             title="Unggah dokumen (PDF, Word, Excel)"
           >
             <Plus size={20} />
@@ -237,7 +309,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
             type="button" 
             onClick={() => imageInputRef.current?.click()}
             disabled={isLoading || isRecording}
-            className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50" 
+            className={`rounded-full p-2 transition-colors disabled:opacity-50 ${
+              isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
+            }`}
             title="Unggah gambar"
           >
             <ImageIcon size={20} />
@@ -250,19 +324,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isRecording ? "Sedang merekam..." : "Tulis pesan di sini"}
-          className="flex-1 min-w-0 max-h-[200px] bg-transparent border-none focus:ring-0 resize-none py-3 px-1.5 md:px-2 text-[15px] text-slate-800 placeholder-slate-500 outline-none disabled:opacity-50"
+          placeholder={isRecording ? "Sedang merekam..." : placeholder}
+          className={`max-h-[200px] min-w-0 flex-1 resize-none border-none bg-transparent px-1.5 py-3 text-[15px] outline-none focus:ring-0 disabled:opacity-50 md:px-2 ${
+            isHero ? 'text-slate-800 placeholder-slate-500' : 'text-slate-800 placeholder-slate-500'
+          }`}
           rows={1}
           disabled={isLoading || isRecording}
         />
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-1 pb-1 pr-1 md:pr-2">
-          {input.trim() || attachments.length > 0 ? (
+          {input.trim() || voiceTranscript.trim() || attachments.length > 0 ? (
             <button
               type="submit"
               disabled={isLoading || isRecording}
-              className="p-2 rounded-full bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              className={`rounded-full p-2 text-white transition-colors disabled:opacity-50 ${
+                isHero ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 hover:bg-slate-700'
+              }`}
               aria-label="Kirim pesan"
             >
               <Send size={18} />
@@ -272,7 +350,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
               type="button" 
               onClick={startRecording}
               disabled={isLoading || isRecording}
-              className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50" 
+              className={`rounded-full p-2 transition-colors disabled:opacity-50 ${
+                isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
+              }`}
               title="Gunakan mikrofon"
             >
               <Mic size={20} />

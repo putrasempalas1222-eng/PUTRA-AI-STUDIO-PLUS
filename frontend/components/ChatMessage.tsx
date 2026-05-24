@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Message } from '../types';
-import { Check, Copy, Download, Sparkles, FileText, Image as ImageIcon, Music, File } from 'lucide-react';
+import { Check, Copy, Download, FileText, Image as ImageIcon, Music, File, Volume2, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatMessageProps {
@@ -50,6 +50,8 @@ const downloadImage = async (src: string, filename: string) => {
   }
 };
 
+const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09';
+
 interface CopyButtonProps {
   text: string;
   label?: string;
@@ -77,6 +79,59 @@ const CopyButton: React.FC<CopyButtonProps> = ({ text, label = 'Salin', classNam
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
       <span>{copied ? 'Tersalin' : label}</span>
+    </button>
+  );
+};
+
+interface ReadAloudButtonProps {
+  text: string;
+}
+
+const ReadAloudButton: React.FC<ReadAloudButtonProps> = ({ text }) => {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
+
+  const handleReadAloud = () => {
+    if (!text.trim()) return;
+
+    if (!('speechSynthesis' in window)) {
+      alert('Browser ini belum mendukung pembaca teks.');
+      return;
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'id-ID';
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleReadAloud}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+      title={isSpeaking ? 'Berhenti membaca' : 'Bacakan'}
+      aria-label={isSpeaking ? 'Berhenti membaca' : 'Bacakan'}
+    >
+      {isSpeaking ? <Square size={14} fill="currentColor" /> : <Volume2 size={14} />}
+      <span>{isSpeaking ? 'Berhenti' : 'Bacakan'}</span>
     </button>
   );
 };
@@ -187,23 +242,34 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
           {/* Render Text */}
           {message.text && (
-            <div className="bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-sm">
-              <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.text}</p>
-            </div>
+            <>
+              <div className="bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-sm">
+                <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.text}</p>
+              </div>
+              <CopyButton
+                text={message.text}
+                label="Salin"
+                className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              />
+            </>
           )}
         </div>
       </div>
     );
   }
 
-  // Model Message - Left aligned, no bubble, with Sparkles icon
+  // Model Message - Left aligned, no bubble, with assistant icon
   return (
     <div className="flex w-full mb-8 justify-start">
       <div className="flex max-w-full md:max-w-[90%] flex-row items-start gap-4">
         {/* Assistant icon */}
         <div className="flex-shrink-0 mt-1">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-red-500 flex items-center justify-center text-white shadow-sm">
-            <Sparkles size={16} className="fill-white" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
+            <img
+              src={APP_ICON_URL}
+              alt="PUTRA AI STUDIO"
+              className="h-6 w-6 object-contain"
+            />
           </div>
         </div>
 
@@ -249,6 +315,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 label="Salin"
                 className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               />
+              <ReadAloudButton text={message.text} />
               {message.imageBase64 && (
                 <DownloadImageButton
                   src={message.imageBase64}
