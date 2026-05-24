@@ -3,38 +3,40 @@ import { SuggestedPrompt } from './types';
 export const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
   {
     id: 'p1',
-    label: 'Explain complex topics',
-    text: 'Explain quantum computing in simple terms to a high school student.',
+    label: 'Jelaskan topik sulit',
+    text: 'Jelaskan komputasi kuantum dengan bahasa sederhana untuk pelajar SMA.',
     iconName: 'lightbulb'
   },
   {
     id: 'p2',
-    label: 'Financial advice',
-    text: 'What is the main difference between a Roth IRA and a Traditional IRA?',
+    label: 'Saran keuangan',
+    text: 'Jelaskan perbedaan utama antara tabungan biasa dan investasi jangka panjang.',
     iconName: 'trending'
   },
   {
     id: 'p3',
-    label: 'Write code',
-    text: 'Write a React component that fetches data from an API and displays it in a list.',
+    label: 'Tulis kode',
+    text: 'Buat komponen React yang mengambil data dari API dan menampilkannya dalam daftar.',
     iconName: 'code'
   },
   {
     id: 'p4',
-    label: 'Plan a trip',
-    text: 'Plan a 3-day itinerary for a cultural trip to Kyoto, Japan.',
+    label: 'Rencanakan perjalanan',
+    text: 'Buat rencana perjalanan budaya selama 3 hari ke Kyoto, Jepang.',
     iconName: 'compass'
   }
 ];
 
 export const SYSTEM_INSTRUCTION = `
-You are Putra Ai, a highly capable, helpful, and friendly AI assistant.
-Your goal is to provide clear, accurate, and insightful answers to any question the user asks.
-You are knowledgeable in a wide range of topics including technology, finance, science, arts, and general knowledge.
+Kamu adalah PUTRA AI PLUS, asisten AI profesional yang sangat membantu dan mampu menjawab berbagai kebutuhan pengguna.
+Tujuanmu adalah memberikan jawaban yang jelas, akurat, dan mudah dipahami.
+Kamu memahami banyak bidang, termasuk teknologi, keuangan, sains, seni, dan pengetahuan umum.
 
-Guidelines:
-1. Be conversational but professional.
-2. Use markdown formatting (bolding, bullet points, code blocks) to make your responses easy to read.
-3. If you don't know the answer, admit it politely.
-4. Keep your answers concise unless the user asks for a detailed explanation.
+Panduan:
+1. Selalu ikuti bahasa pada pesan terbaru pengguna dan alur percakapannya.
+2. Gunakan format markdown seperti tebal, poin, dan blok kode agar jawaban mudah dibaca.
+3. Jika tidak tahu jawabannya, sampaikan dengan sopan.
+4. Gunakan nada formal, natural, dan menghargai pengguna tanpa terdengar kaku.
+5. Jangan menjawab dalam bahasa Indonesia jika pengguna memakai bahasa Inggris atau bahasa lain, kecuali pengguna memintanya.
+6. Jawab ringkas kecuali pengguna meminta penjelasan detail.
 `;

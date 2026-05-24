@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { User, getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { ChatSession, Message } from "../types";
 
 const firebaseConfig = {
@@ -18,6 +19,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // --- Firestore Helpers ---
 
@@ -46,14 +48,22 @@ export const saveChatSession = async (userId: string, sessionId: string, title: 
     const now = new Date().toISOString();
     const sessionCreatedAt = Number.isFinite(Number(sessionId)) ? new Date(Number(sessionId)).toISOString() : now;
     
-    // Convert Date objects to ISO strings and strip large base64 data to prevent Firestore quota issues
-    const serializedMessages = messages.map(msg => {
+    // Convert Date objects to ISO strings. Generated image data URLs are moved to Storage
+    // so chat documents stay small and images still load from history.
+    const serializedMessages = await Promise.all(messages.map(async (msg) => {
       const serializedMsg: any = {
         ...msg,
         timestamp: msg.timestamp.toISOString()
       };
 
       delete serializedMsg.animateTyping;
+
+      if (msg.imageBase64?.startsWith('data:image/')) {
+        const extension = msg.imageBase64.match(/^data:image\/([^;]+);base64,/)?.[1] || 'png';
+        const imageRef = ref(storage, `users/${userId}/chat-images/${sessionId}/${msg.id}.${extension}`);
+        await uploadString(imageRef, msg.imageBase64, 'data_url');
+        serializedMsg.imageBase64 = await getDownloadURL(imageRef);
+      }
 
       if (msg.attachments) {
         serializedMsg.attachments = msg.attachments.map(att => ({
@@ -65,7 +75,7 @@ export const saveChatSession = async (userId: string, sessionId: string, title: 
       }
 
       return serializedMsg;
-    });
+    }));
 
     await setDoc(sessionRef, {
       id: sessionId,

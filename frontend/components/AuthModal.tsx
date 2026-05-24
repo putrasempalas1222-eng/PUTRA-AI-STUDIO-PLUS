@@ -40,10 +40,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
         onClose();
       } else if (mode === 'forgot') {
         await sendPasswordResetEmail(auth, email);
-        setSuccessMsg('Password reset email sent! Check your inbox.');
+        setSuccessMsg('Email reset kata sandi sudah dikirim. Periksa kotak masuk Anda.');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
+      setError(err.message || 'Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -56,12 +56,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <h2 className="text-xl font-semibold text-slate-800">
-            {mode === 'login' && 'Sign In'}
-            {mode === 'register' && 'Create Account'}
-            {mode === 'forgot' && 'Reset Password'}
+            {mode === 'login' && 'Masuk'}
+            {mode === 'register' && 'Buat Akun'}
+            {mode === 'forgot' && 'Reset Kata Sandi'}
           </h2>
           {canClose && (
-            <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+            <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors" aria-label="Tutup modal">
               <X size={20} />
             </button>
           )}
@@ -82,20 +82,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Alamat Email</label>
               <input 
                 type="email" 
                 required 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                placeholder="you@example.com"
+                placeholder="nama@email.com"
               />
             </div>
 
             {mode !== 'forgot' && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Kata Sandi</label>
                 <input 
                   type="password" 
                   required 
@@ -114,7 +114,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
                   onClick={() => onChangeMode('forgot')}
                   className="text-sm text-blue-600 hover:underline"
                 >
-                  Forgot password?
+                  Lupa kata sandi?
                 </button>
               </div>
             )}
@@ -124,9 +124,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
               disabled={loading}
               className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors disabled:opacity-70"
             >
-              {loading ? 'Please wait...' : (
-                mode === 'login' ? 'Sign In' : 
-                mode === 'register' ? 'Sign Up' : 'Send Reset Link'
+              {loading ? 'Mohon tunggu...' : (
+                mode === 'login' ? 'Masuk' : 
+                mode === 'register' ? 'Daftar' : 'Kirim Link Reset'
               )}
             </button>
           </form>
@@ -134,9 +134,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
           {/* Footer Links */}
           <div className="mt-6 text-center text-sm text-slate-600">
             {mode === 'login' ? (
-              <p>Don't have an account? <button onClick={() => onChangeMode('register')} className="text-blue-600 font-medium hover:underline">Sign up</button></p>
+              <p>Belum punya akun? <button onClick={() => onChangeMode('register')} className="text-blue-600 font-medium hover:underline">Daftar</button></p>
             ) : (
-              <p>Already have an account? <button onClick={() => onChangeMode('login')} className="text-blue-600 font-medium hover:underline">Sign in</button></p>
+              <p>Sudah punya akun? <button onClick={() => onChangeMode('login')} className="text-blue-600 font-medium hover:underline">Masuk</button></p>
             )}
           </div>
         </div>

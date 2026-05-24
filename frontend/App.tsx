@@ -10,21 +10,29 @@ import { Sidebar } from './components/Sidebar';
 import { AuthModal, AuthMode } from './components/AuthModal';
 import { Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
 
+const THINKING_STEPS = [
+  'Memahami permintaan',
+  'Menentukan tujuan',
+  'Menyusun jawaban',
+];
+
 const App: React.FC = () => {
   // Chat State
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [thinkingStep, setThinkingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   
   // History State
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Auth State
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('hidden');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const subscriptionBadge = 'BASIC';
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isSendingRef = useRef(false);
@@ -41,18 +49,13 @@ const App: React.FC = () => {
           await ensureUserDocument(currentUser);
           await loadHistory(currentUser.uid);
         } catch (err) {
-          setError(err instanceof Error ? `Firestore error: ${err.message}` : 'Firestore error: failed to load chat history.');
+          setError(err instanceof Error ? `Kesalahan Firestore: ${err.message}` : 'Kesalahan Firestore: gagal memuat riwayat chat.');
         }
       } else {
         setChatHistory([]);
         setAuthMode('login');
       }
     });
-
-    // Auto-close sidebar on mobile initially
-    if (window.innerWidth < 768) {
-      setIsSidebarOpen(false);
-    }
 
     return () => unsubscribe();
   }, []);
@@ -63,6 +66,19 @@ const App: React.FC = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setThinkingStep(0);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setThinkingStep((step) => (step + 1) % THINKING_STEPS.length);
+    }, 1600);
+
+    return () => window.clearInterval(timer);
+  }, [isLoading]);
 
   const loadHistory = async (uid: string) => {
     try {
@@ -94,7 +110,7 @@ const App: React.FC = () => {
 
     if (!user) {
       setAuthMode('login');
-      setError('Please sign in or create an account before chatting.');
+      setError('Silakan masuk atau buat akun sebelum mulai chat.');
       return;
     }
 
@@ -125,12 +141,12 @@ const App: React.FC = () => {
       } else if (attachments.length > 0) {
         sessionTitle = `File: ${attachments[0].name}`;
       } else {
-        sessionTitle = 'New Chat';
+        sessionTitle = 'Chat Baru';
       }
     } else {
       // Find existing title from history
       const existingSession = chatHistory.find(s => s.id === sessionId);
-      sessionTitle = existingSession ? existingSession.title : 'Chat Session';
+      sessionTitle = existingSession ? existingSession.title : 'Sesi Chat';
     }
 
     updateLocalHistory(sessionId, sessionTitle, updatedMessagesAfterUser);
@@ -139,7 +155,7 @@ const App: React.FC = () => {
       try {
         await saveChatSession(user.uid, sessionId, sessionTitle, updatedMessagesAfterUser);
       } catch (err) {
-        setError(err instanceof Error ? `Firestore save failed: ${err.message}` : 'Firestore save failed.');
+        setError(err instanceof Error ? `Gagal menyimpan ke Firestore: ${err.message}` : 'Gagal menyimpan ke Firestore.');
       }
     }
 
@@ -166,7 +182,7 @@ const App: React.FC = () => {
       }
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan yang tidak terduga.');
     } finally {
       isSendingRef.current = false;
       setIsLoading(false);
@@ -178,9 +194,7 @@ const App: React.FC = () => {
     setMessages([]);
     setCurrentSessionId(null);
     setError(null);
-    if (window.innerWidth < 768) {
-      setIsSidebarOpen(false);
-    }
+    setIsSidebarOpen(false);
   };
 
   const handleSelectSession = (session: ChatSession) => {
@@ -188,9 +202,7 @@ const App: React.FC = () => {
     setMessages(session.messages);
     setCurrentSessionId(session.id);
     setError(null);
-    if (window.innerWidth < 768) {
-      setIsSidebarOpen(false);
-    }
+    setIsSidebarOpen(false);
   };
 
   const handleLogout = async () => {
@@ -217,17 +229,27 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col h-full relative min-w-0">
         
         {/* Header */}
-        <header className="flex items-center justify-between p-4 sticky top-0 bg-white/80 backdrop-blur-md z-10">
-          <div className="flex items-center gap-4">
+        <header className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100/70">
+          <div className="flex min-w-0 items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
+              aria-label="Buka riwayat chat"
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-xl font-medium text-slate-600 flex items-center gap-2 cursor-pointer" onClick={handleNewChat}>
-              Putra Ai
-            </h1>
+            <button
+              type="button"
+              className="min-w-0 flex items-center gap-2 text-left"
+              onClick={handleNewChat}
+            >
+              <span className="truncate text-lg md:text-xl font-semibold text-slate-600">
+                PUTRA AI PLUS
+              </span>
+              <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold leading-4 text-blue-700">
+                {subscriptionBadge}
+              </span>
+            </button>
           </div>
           
           <div className="flex items-center gap-3 relative">
@@ -251,7 +273,7 @@ const App: React.FC = () => {
                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-slate-50 flex items-center gap-2"
                     >
                       <LogOut size={16} />
-                      Sign Out
+                      Keluar
                     </button>
                   </div>
                 )}
@@ -261,16 +283,19 @@ const App: React.FC = () => {
         </header>
 
         {/* Chat Area */}
-        <main className="flex-1 overflow-y-auto pb-36">
+        <main className="flex-1 overflow-y-auto pb-48 md:pb-44">
           {messages.length === 0 ? (
             // Empty State / Greeting
-            <div className="max-w-4xl mx-auto px-6 pt-12 md:pt-20 flex flex-col h-full">
-              <div className="mb-12">
-                <h2 className="text-[40px] md:text-[56px] font-semibold tracking-tight leading-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-red-500">
-                  Hello,
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 md:pt-16 flex min-h-full flex-col">
+              <div className="mb-8 md:mb-10 max-w-3xl">
+                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-red-500 text-white shadow-sm">
+                  <Sparkles size={20} className="fill-white" />
+                </div>
+                <h2 className="text-4xl md:text-6xl font-semibold tracking-normal leading-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-violet-500 to-rose-500">
+                  Halo.
                 </h2>
-                <h2 className="text-[40px] md:text-[56px] font-semibold tracking-tight leading-tight text-[#c4c7c5]">
-                  How can I help you today?
+                <h2 className="text-3xl md:text-5xl font-semibold tracking-normal leading-tight text-slate-400">
+                  Apa yang ingin Anda buat atau bahas hari ini?
                 </h2>
               </div>
               <SuggestedPrompts onSelectPrompt={(text) => handleSendMessage(text, [])} disabled={isLoading || !user} />
@@ -290,11 +315,16 @@ const App: React.FC = () => {
                         <Sparkles size={16} className="fill-white" />
                       </div>
                     </div>
-                    <div className="flex-1 py-2">
-                      <div className="flex gap-1.5">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <div className="flex-1 py-1.5">
+                      <div className="inline-flex items-center gap-3 rounded-full bg-slate-50 px-3.5 py-2 text-slate-600 shadow-sm ring-1 ring-slate-200/70">
+                        <div className="flex items-center gap-1.5" aria-hidden="true">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {THINKING_STEPS[thinkingStep]}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -313,12 +343,18 @@ const App: React.FC = () => {
         </main>
 
         {/* Input Area Fixed at Bottom */}
-        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-10 pb-4 px-4 md:px-6">
+        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-10 pb-4 px-3 md:px-6">
           <div className="max-w-3xl mx-auto">
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !user} />
             <div className="text-center mt-3">
               <p className="text-xs text-slate-500">
-                Putra Ai may display inaccurate info, including about people, so double-check its responses.
+                © 2026 PUTRA AI STUDIO.{' '}
+                <a
+                  href="https://www.putraaistudioapikey.site/#privacy"
+                  className="font-medium text-slate-600 underline underline-offset-2 hover:text-blue-600"
+                >
+                  Kebijakan & Privasi
+                </a>
               </p>
             </div>
           </div>

@@ -68,12 +68,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           data: base64Data
         });
       } catch (error) {
-        console.error("Error reading file:", error);
+        console.error("Gagal membaca file:", error);
       }
     }
 
     setAttachments(prev => [...prev, ...newAttachments]);
-    if (e.target) e.target.value = ''; // Reset input
+    if (e.target) e.target.value = '';
   };
 
   const removeAttachment = (id: string) => {
@@ -97,7 +97,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
         
         setAttachments(prev => [...prev, {
           id: Date.now().toString(),
-          name: `Voice_Message_${new Date().toLocaleTimeString().replace(/:/g, '-')}.webm`,
+          name: `Pesan_Suara_${new Date().toLocaleTimeString().replace(/:/g, '-')}.webm`,
           mimeType: 'audio/webm',
           data: base64Data
         }]);
@@ -115,8 +115,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
       }, 1000);
 
     } catch (error) {
-      console.error("Error accessing microphone:", error);
-      alert("Could not access microphone. Please check permissions.");
+      console.error("Gagal mengakses mikrofon:", error);
+      alert("Tidak dapat mengakses mikrofon. Periksa izin mikrofon Anda.");
     }
   };
 
@@ -163,7 +163,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
   };
 
   return (
-    <div className="relative flex flex-col bg-[#f0f4f9] rounded-[32px] transition-all focus-within:bg-white focus-within:shadow-[0_0_15px_rgba(0,0,0,0.05)] focus-within:ring-1 focus-within:ring-gray-200">
+    <div className="relative flex flex-col bg-[#f0f4f9] rounded-[28px] md:rounded-[32px] shadow-lg shadow-slate-900/5 transition-all focus-within:bg-white focus-within:shadow-[0_8px_24px_rgba(15,23,42,0.08)] focus-within:ring-1 focus-within:ring-gray-200">
       
       {/* Hidden File Inputs */}
       <input 
@@ -208,7 +208,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
         <div className="flex items-center justify-between px-4 py-3 bg-red-50 rounded-t-[32px] border-b border-red-100">
           <div className="flex items-center gap-3">
             <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-red-600">Recording Voice... {formatTime(recordingTime)}</span>
+            <span className="text-sm font-medium text-red-600">Merekam suara... {formatTime(recordingTime)}</span>
           </div>
           <button 
             type="button" 
@@ -221,15 +221,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
       )}
 
       {/* Input Area */}
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 px-2 py-2">
+      <form onSubmit={handleSubmit} className="flex items-end gap-1.5 md:gap-2 px-2 py-2">
         {/* Left Action Buttons */}
-        <div className="flex items-center gap-1 pb-1 pl-2">
+        <div className="flex items-center gap-0.5 md:gap-1 pb-1 pl-1 md:pl-2">
           <button 
             type="button" 
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || isRecording}
             className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50" 
-            title="Upload document (PDF, Word, Excel)"
+            title="Unggah dokumen (PDF, Word, Excel)"
           >
             <Plus size={20} />
           </button>
@@ -238,7 +238,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
             onClick={() => imageInputRef.current?.click()}
             disabled={isLoading || isRecording}
             className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50" 
-            title="Upload image"
+            title="Unggah gambar"
           >
             <ImageIcon size={20} />
           </button>
@@ -250,20 +250,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isRecording ? "Recording..." : "Enter a prompt here"}
-          className="flex-1 max-h-[200px] bg-transparent border-none focus:ring-0 resize-none py-3 px-2 text-[15px] text-slate-800 placeholder-slate-500 outline-none disabled:opacity-50"
+          placeholder={isRecording ? "Sedang merekam..." : "Tulis pesan di sini"}
+          className="flex-1 min-w-0 max-h-[200px] bg-transparent border-none focus:ring-0 resize-none py-3 px-1.5 md:px-2 text-[15px] text-slate-800 placeholder-slate-500 outline-none disabled:opacity-50"
           rows={1}
           disabled={isLoading || isRecording}
         />
 
         {/* Right Action Buttons */}
-        <div className="flex items-center gap-1 pb-1 pr-2">
+        <div className="flex items-center gap-1 pb-1 pr-1 md:pr-2">
           {input.trim() || attachments.length > 0 ? (
             <button
               type="submit"
               disabled={isLoading || isRecording}
               className="p-2 rounded-full bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition-colors"
-              aria-label="Send message"
+              aria-label="Kirim pesan"
             >
               <Send size={18} />
             </button>
@@ -273,7 +273,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
               onClick={startRecording}
               disabled={isLoading || isRecording}
               className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50" 
-              title="Use microphone"
+              title="Gunakan mikrofon"
             >
               <Mic size={20} />
             </button>

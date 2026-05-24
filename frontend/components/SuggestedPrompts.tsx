@@ -20,13 +20,13 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ onSelectProm
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-4xl mx-auto mt-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 w-full">
       {SUGGESTED_PROMPTS.map((prompt) => (
         <button
           key={prompt.id}
           onClick={() => onSelectPrompt(prompt.text)}
           disabled={disabled}
-          className="flex flex-col justify-between h-40 p-4 rounded-2xl bg-[#f0f4f9] hover:bg-[#e2e8f0] transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+          className="flex flex-col justify-between min-h-32 md:min-h-36 p-4 rounded-2xl bg-[#f3f6fb] hover:bg-[#e8eef7] border border-slate-200/70 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed group"
         >
           <p className="text-[15px] text-slate-700 leading-snug line-clamp-3">
             {prompt.text}

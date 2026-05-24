@@ -45,17 +45,17 @@ class PutraAiService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message || data?.error || 'Putra API request failed.');
+        throw new Error(data?.message || data?.error || 'Permintaan ke Putra API gagal.');
       }
 
       return {
-        text: data?.text || 'I apologize, but I was unable to generate a response.',
+        text: data?.text || 'Maaf, saya belum bisa membuat balasan.',
         imageBase64: data?.imageBase64 || '',
         mode: data?.mode || '',
       };
     } catch (error) {
-      console.error('Error communicating with Putra API:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to get a response from Putra Ai. Please try again later.');
+      console.error('Gagal berkomunikasi dengan Putra API:', error);
+      throw new Error(error instanceof Error ? error.message : 'Gagal mendapatkan balasan dari PUTRA AI PLUS. Silakan coba lagi nanti.');
     }
   }
 
