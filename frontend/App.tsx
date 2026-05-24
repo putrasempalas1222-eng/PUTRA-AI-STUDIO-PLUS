@@ -37,6 +37,22 @@ const App: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isSendingRef = useRef(false);
 
+  useEffect(() => {
+    const setAppHeight = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+    };
+
+    setAppHeight();
+    window.addEventListener('resize', setAppHeight);
+    window.visualViewport?.addEventListener('resize', setAppHeight);
+
+    return () => {
+      window.removeEventListener('resize', setAppHeight);
+      window.visualViewport?.removeEventListener('resize', setAppHeight);
+    };
+  }, []);
+
   // Initialize Gemini and listen to Auth state
   useEffect(() => {
     geminiService.initChat();
@@ -212,7 +228,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
+    <div className="flex h-[var(--app-height,100dvh)] w-full bg-white font-sans overflow-hidden">
       
       {/* Sidebar */}
       <Sidebar 
@@ -226,10 +242,10 @@ const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-full relative min-w-0">
+      <div className="flex-1 flex flex-col h-full min-h-0 relative min-w-0">
         
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100/70">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100/70 bg-white/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md md:px-6 md:pb-4 md:pt-[calc(env(safe-area-inset-top)+1rem)]">
           <div className="flex min-w-0 items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -283,7 +299,7 @@ const App: React.FC = () => {
         </header>
 
         {/* Chat Area */}
-        <main className="flex-1 overflow-y-auto pb-48 md:pb-44">
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-48 md:pb-44">
           {messages.length === 0 ? (
             // Empty State / Greeting
             <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 md:pt-16 flex min-h-full flex-col">
@@ -343,7 +359,7 @@ const App: React.FC = () => {
         </main>
 
         {/* Input Area Fixed at Bottom */}
-        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-10 pb-4 px-3 md:px-6">
+        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 md:px-6">
           <div className="max-w-3xl mx-auto">
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !user} />
             <div className="text-center mt-3">

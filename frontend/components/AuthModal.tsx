@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword, 
   sendPasswordResetEmail 
 } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 
 export type AuthMode = 'login' | 'register' | 'forgot' | 'hidden';
 
@@ -25,6 +26,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
 
   if (mode === 'hidden') return null;
 
+  const getAuthErrorMessage = (err: unknown) => {
+    if (!(err instanceof FirebaseError)) {
+      return 'Terjadi kesalahan. Silakan coba lagi.';
+    }
+
+    switch (err.code) {
+      case 'auth/invalid-credential':
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+        return 'Email atau kata sandi salah. Jika belum punya akun, silakan daftar dulu.';
+      case 'auth/email-already-in-use':
+        return 'Email ini sudah terdaftar. Silakan masuk atau gunakan reset kata sandi.';
+      case 'auth/invalid-email':
+        return 'Format email tidak valid.';
+      case 'auth/missing-password':
+        return 'Kata sandi wajib diisi.';
+      case 'auth/weak-password':
+        return 'Kata sandi minimal 6 karakter.';
+      case 'auth/too-many-requests':
+        return 'Terlalu banyak percobaan login. Tunggu sebentar lalu coba lagi.';
+      case 'auth/network-request-failed':
+        return 'Koneksi bermasalah. Periksa internet Anda lalu coba lagi.';
+      case 'auth/operation-not-allowed':
+        return 'Login email dan kata sandi belum aktif di Firebase Authentication.';
+      default:
+        return err.message || 'Terjadi kesalahan. Silakan coba lagi.';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -32,18 +62,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
     setLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (!normalizedEmail) {
+        setError('Email wajib diisi.');
+        return;
+      }
+
+      if (mode !== 'forgot' && !password) {
+        setError('Kata sandi wajib diisi.');
+        return;
+      }
+
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
         onClose();
       } else if (mode === 'register') {
-        await createUserWithEmailAndPassword(auth, email, password);
+        await createUserWithEmailAndPassword(auth, normalizedEmail, password);
         onClose();
       } else if (mode === 'forgot') {
-        await sendPasswordResetEmail(auth, email);
+        await sendPasswordResetEmail(auth, normalizedEmail);
         setSuccessMsg('Email reset kata sandi sudah dikirim. Periksa kotak masuk Anda.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan. Silakan coba lagi.');
+    } catch (err) {
+      setError(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
