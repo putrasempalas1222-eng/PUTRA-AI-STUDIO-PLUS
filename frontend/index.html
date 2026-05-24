@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Putra Ai</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom scrollbar for a cleaner look */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #cbd5e1;
+    }
+    
+    /* Markdown Styles */
+    .markdown-body p { margin-bottom: 1em; line-height: 1.6; }
+    .markdown-body p:last-child { margin-bottom: 0; }
+    .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+    .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+    .markdown-body li { margin-bottom: 0.5em; line-height: 1.6; }
+    .markdown-body strong { font-weight: 600; color: #1e293b; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 600; margin-top: 1.5em; margin-bottom: 0.75em; color: #0f172a; }
+    .markdown-body h3 { font-size: 1.25em; }
+    .markdown-body code { background-color: #f1f5f9; padding: 0.2em 0.4em; border-radius: 0.25em; font-size: 0.9em; font-family: monospace; }
+    .markdown-body pre { background-color: #f8fafc; padding: 1em; border-radius: 0.5em; overflow-x: auto; margin-bottom: 1em; border: 1px solid #e2e8f0; }
+    .markdown-body pre code { background-color: transparent; padding: 0; border-radius: 0; }
+  </style>
+</head>
+<body class="bg-white text-slate-800 antialiased h-screen overflow-hidden">
+  <div id="root" class="h-full"></div>
+  <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.js"></script></body>
+</html>

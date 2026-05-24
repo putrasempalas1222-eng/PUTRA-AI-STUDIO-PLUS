@@ -1,0 +1,7 @@
+{
+  "name": "Putra Ai",
+  "description": "An advanced AI assistant with a Gemini-like interface, built with React, Tailwind CSS, the Gemini API, and Firebase for chat history and authentication.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
