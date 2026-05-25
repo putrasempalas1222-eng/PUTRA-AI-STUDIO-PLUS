@@ -89,6 +89,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTypingResponse, setIsTypingResponse] = useState(false);
   const [thinkingStep, setThinkingStep] = useState(0);
   const [activeThinkingSteps, setActiveThinkingSteps] = useState(THINKING_STEPS);
   const [error, setError] = useState<string | null>(null);
@@ -191,7 +192,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleSendMessage = useCallback(async (text: string, attachments: Attachment[] = []) => {
-    if (isSendingRef.current || isLoading) return;
+    if (isSendingRef.current || isLoading || isTypingResponse) return;
     if (!text.trim() && attachments.length === 0) return;
 
     if (!user) {
@@ -263,6 +264,7 @@ const App: React.FC = () => {
       };
       
       const finalMessages = [...updatedMessagesAfterUser, newModelMessage];
+      setIsTypingResponse(true);
       setMessages(finalMessages);
       updateLocalHistory(sessionId, sessionTitle, finalMessages);
 
@@ -273,11 +275,22 @@ const App: React.FC = () => {
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan yang tidak terduga.');
-    } finally {
+      setIsTypingResponse(false);
       isSendingRef.current = false;
+    } finally {
       setIsLoading(false);
     }
-  }, [messages, currentSessionId, user, chatHistory, updateLocalHistory, isLoading]);
+  }, [messages, currentSessionId, user, chatHistory, updateLocalHistory, isLoading, isTypingResponse]);
+
+  const handleTypingComplete = useCallback((messageId: string) => {
+    setMessages((currentMessages) =>
+      currentMessages.map((message) =>
+        message.id === messageId ? { ...message, animateTyping: false } : message,
+      ),
+    );
+    setIsTypingResponse(false);
+    isSendingRef.current = false;
+  }, []);
 
   const handleNewChat = () => {
     geminiService.resetChat();
@@ -285,6 +298,8 @@ const App: React.FC = () => {
     setMessages([]);
     setCurrentSessionId(null);
     setError(null);
+    setIsTypingResponse(false);
+    isSendingRef.current = false;
     setIsSidebarOpen(false);
   };
 
@@ -294,6 +309,8 @@ const App: React.FC = () => {
     setMessages(session.messages);
     setCurrentSessionId(session.id);
     setError(null);
+    setIsTypingResponse(false);
+    isSendingRef.current = false;
     setIsSidebarOpen(false);
   };
 
@@ -320,7 +337,7 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         onNewChat={handleNewChat}
-        onOpenVoice={handleOpenVoice}
+                onOpenVoice={handleOpenVoice}
         activeView={activeView}
         history={chatHistory}
         currentSessionId={currentSessionId}
@@ -433,7 +450,7 @@ const App: React.FC = () => {
                 <div className="w-full">
                   <ChatInput
                     onSendMessage={handleSendMessage}
-                    isLoading={isLoading || !user}
+                    isLoading={isLoading || isTypingResponse || !user}
                     variant="hero"
                     placeholder="Minta PUTRA AI"
                   />
@@ -449,7 +466,7 @@ const App: React.FC = () => {
             // Messages List
             <div className="max-w-3xl mx-auto px-4 md:px-6 pt-6">
               {messages.map((msg) => (
-                <ChatMessage key={msg.id} message={msg} />
+                <ChatMessage key={msg.id} message={msg} onTypingComplete={handleTypingComplete} />
               ))}
               
               {isLoading && (
@@ -496,7 +513,7 @@ const App: React.FC = () => {
         {activeView === 'chat' && !isEmptyChat && (
         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 md:px-6">
           <div className="max-w-3xl mx-auto">
-            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !user} />
+            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isTypingResponse || !user} />
             <div className="text-center mt-3">
               <p className="text-xs text-slate-500">
                 © 2026 PUTRA AI STUDIO.{' '}

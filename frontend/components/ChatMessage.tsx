@@ -6,6 +6,7 @@ import { downloadDocx } from '../services/docx';
 
 interface ChatMessageProps {
   message: Message;
+  onTypingComplete?: (messageId: string) => void;
 }
 
 const copyText = async (text: string) => {
@@ -467,7 +468,7 @@ const PreviewLink: React.FC<PreviewLinkProps> = ({ href = '', children }) => {
   );
 };
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingComplete }) => {
   const isModel = message.role === 'model';
   const [typedWordCount, setTypedWordCount] = useState(0);
   const [codePreview, setCodePreview] = useState<{ code: string; language?: string } | null>(null);
@@ -478,13 +479,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isAnimationComplete = !shouldAnimate || typedWordCount >= words.length;
 
   useEffect(() => {
-    if (!shouldAnimate) return;
+    if (!shouldAnimate) {
+      if (isModel) onTypingComplete?.(message.id);
+      return;
+    }
 
     setTypedWordCount(0);
     const timer = window.setInterval(() => {
       setTypedWordCount((count) => {
         if (count >= words.length) {
           window.clearInterval(timer);
+          onTypingComplete?.(message.id);
           return count;
         }
 

@@ -40,6 +40,22 @@ const getChatRetentionCutoff = () => {
   return cutoffDate;
 };
 
+const removeUndefinedFields = (value: any): any => {
+  if (Array.isArray(value)) {
+    return value.map(removeUndefinedFields);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, itemValue]) => itemValue !== undefined)
+        .map(([key, itemValue]) => [key, removeUndefinedFields(itemValue)]),
+    );
+  }
+
+  return value;
+};
+
 export const ensureUserDocument = async (user: User) => {
   try {
     const userRef = doc(db, `users/${user.uid}`);
@@ -91,10 +107,10 @@ export const saveChatSession = async (userId: string, sessionId: string, title: 
         }));
       }
 
-      return serializedMsg;
+      return removeUndefinedFields(serializedMsg);
     }));
 
-    await setDoc(sessionRef, {
+    await setDoc(sessionRef, removeUndefinedFields({
       id: sessionId,
       userId,
       title,
@@ -104,7 +120,7 @@ export const saveChatSession = async (userId: string, sessionId: string, title: 
       messageCount: serializedMessages.length,
       lastMessage: serializedMessages[serializedMessages.length - 1]?.text?.slice(0, 240) || '',
       messages: serializedMessages
-    }, { merge: true });
+    }), { merge: true });
   } catch (error) {
     console.error("Error saving chat session:", error);
     throw error;
