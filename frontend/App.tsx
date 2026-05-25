@@ -53,6 +53,20 @@ const IMAGE_GENERATION_KEYWORDS = [
   'create image',
 ];
 
+const DOCX_REQUEST_PATTERN = /\b(docx|word|ms word|microsoft word|file makalah|dokumen makalah|buatkan makalah|makalah|download file|file doc)\b/i;
+
+const wantsDocxFile = (text: string) => DOCX_REQUEST_PATTERN.test(text);
+
+const getDocxTitle = (text: string) => {
+  const cleanText = text
+    .replace(/\b(buatkan|buat|jadikan|generate|file|docx|word|makalah|dokumen|download|tentang|judul)\b/gi, ' ')
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return cleanText ? `Makalah ${cleanText}` : 'Dokumen PUTRA AI';
+};
+
 const getThinkingSteps = (text: string, attachments: Attachment[]) => {
   if (attachments.some((attachment) => attachment.mimeType.startsWith('image/'))) {
     return IMAGE_ANALYSIS_STEPS;
@@ -195,6 +209,7 @@ const App: React.FC = () => {
     };
 
     const updatedMessagesAfterUser = [...messages, newUserMessage];
+    const shouldCreateDocx = wantsDocxFile(text);
     isSendingRef.current = true;
     setActiveThinkingSteps(getThinkingSteps(text, attachments));
     setMessages(updatedMessagesAfterUser);
@@ -242,6 +257,8 @@ const App: React.FC = () => {
         timestamp: new Date(),
         imageBase64: aiResponse.imageBase64,
         mode: aiResponse.mode,
+        downloadDocx: shouldCreateDocx,
+        docxTitle: shouldCreateDocx ? getDocxTitle(text) : undefined,
         animateTyping: true,
       };
       

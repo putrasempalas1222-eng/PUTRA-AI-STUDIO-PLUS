@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Message } from '../types';
 import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { downloadDocx } from '../services/docx';
 
 interface ChatMessageProps {
   message: Message;
@@ -230,6 +231,34 @@ const DownloadImageButton: React.FC<DownloadImageButtonProps> = ({ src, filename
     >
       {downloaded ? <Check size={14} /> : <Download size={14} />}
       <span>{downloaded ? 'Terunduh' : 'Unduh'}</span>
+    </button>
+  );
+};
+
+interface DownloadDocxButtonProps {
+  text: string;
+  title?: string;
+}
+
+const DownloadDocxButton: React.FC<DownloadDocxButtonProps> = ({ text, title = 'Dokumen PUTRA AI' }) => {
+  const [downloaded, setDownloaded] = useState(false);
+
+  const handleDownload = () => {
+    downloadDocx(text, title);
+    setDownloaded(true);
+    window.setTimeout(() => setDownloaded(false), 1400);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+      title={downloaded ? 'DOCX terunduh' : 'Unduh DOCX'}
+      aria-label={downloaded ? 'DOCX terunduh' : 'Unduh DOCX'}
+    >
+      {downloaded ? <Check size={14} /> : <FileText size={14} />}
+      <span>{downloaded ? 'Terunduh' : 'Unduh DOCX'}</span>
     </button>
   );
 };
@@ -570,6 +599,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               />
               <ReadAloudButton text={message.text} />
+              {message.downloadDocx && (
+                <DownloadDocxButton text={message.text} title={message.docxTitle} />
+              )}
               {message.imageBase64 && (
                 <DownloadImageButton
                   src={message.imageBase64}
