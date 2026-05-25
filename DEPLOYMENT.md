@@ -1,10 +1,36 @@
 # Deployment
 
-## Backend
+## Firebase Functions
 
-Backend lives in `functions/` and is deployed to Firebase Functions v2 / Cloud Run.
+Semua function memakai Firebase project:
 
-Current deployed API base URL:
+```txt
+play-integrity-2adpr7x4a8xhyex
+```
+
+Jangan deploy dari folder yang salah. Jalankan command sesuai project supaya function tidak saling tumburan.
+
+### PUTRA AI STUDIO
+
+Source:
+
+```txt
+C:\3D POSTER\PUTRA AI STUDIO\functions\index.js
+```
+
+Codebase:
+
+```txt
+putra-ai-studio
+```
+
+Function:
+
+```txt
+api
+```
+
+API URL:
 
 ```txt
 https://api-mzmdqh3n6a-uc.a.run.app
@@ -13,6 +39,52 @@ https://api-mzmdqh3n6a-uc.a.run.app
 Deploy commands:
 
 ```bash
+cd "C:\3D POSTER\PUTRA AI STUDIO"
+firebase login
+firebase use play-integrity-2adpr7x4a8xhyex
+cd functions
+npm install
+cd ..
+firebase deploy --only functions:putra-ai-studio
+```
+
+Secrets ada di:
+
+```txt
+C:\3D POSTER\PUTRA AI STUDIO\functions\.env
+```
+
+### proxy-api
+
+Source:
+
+```txt
+C:\3D POSTER\proxy-api\functions\index.js
+C:\3D POSTER\proxy-api\functions\admin.js
+```
+
+Codebase:
+
+```txt
+default
+```
+
+Function:
+
+```txt
+api-key
+```
+
+API URL:
+
+```txt
+https://api-key-mzmdqh3n6a-uc.a.run.app
+```
+
+Deploy commands:
+
+```bash
+cd "C:\3D POSTER\proxy-api"
 firebase login
 firebase use play-integrity-2adpr7x4a8xhyex
 cd functions
@@ -21,7 +93,24 @@ cd ..
 firebase deploy --only functions
 ```
 
-Backend secrets stay in `functions/.env` and must not be committed.
+Secrets ada di:
+
+```txt
+C:\3D POSTER\proxy-api\functions\.env
+```
+
+### Cek Function Aktif
+
+```bash
+firebase functions:list --project play-integrity-2adpr7x4a8xhyex
+```
+
+Hasil yang normal:
+
+```txt
+api      -> PUTRA AI STUDIO
+api-key  -> proxy-api
+```
 
 ## Frontend
 

@@ -2,10 +2,13 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
+      "codebase": "putra-ai-studio",
       "ignore": [
         "node_modules",
         ".git",
