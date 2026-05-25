@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Message } from '../types';
-import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Volume2, Square } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatMessageProps {
@@ -237,19 +237,152 @@ const DownloadImageButton: React.FC<DownloadImageButtonProps> = ({ src, filename
 interface CodeBlockProps {
   code: string;
   language?: string;
+  onRunCode?: (code: string, language?: string) => void;
 }
 
-const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => (
+const canRunAsHtml = (code: string, language?: string) => {
+  const normalizedLanguage = String(language || '').toLowerCase();
+  const normalizedCode = code.toLowerCase();
+
+  return normalizedLanguage === 'html' ||
+    normalizedLanguage === 'htm' ||
+    normalizedCode.includes('<!doctype html') ||
+    normalizedCode.includes('<html') ||
+    normalizedCode.includes('<body') ||
+    normalizedCode.includes('<head');
+};
+
+const canRunCode = (code: string, language?: string) => {
+  const normalizedLanguage = String(language || '').toLowerCase();
+
+  return canRunAsHtml(code, language) ||
+    ['javascript', 'js', 'css', 'python', 'py'].includes(normalizedLanguage);
+};
+
+function buildRunnerDocument(code: string, language?: string) {
+  const normalizedLanguage = String(language || '').toLowerCase();
+
+  if (canRunAsHtml(code, language)) {
+    return code;
+  }
+
+  if (normalizedLanguage === 'css') {
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${code}</style>
+</head>
+<body>
+  <main>
+    <h1>CSS Preview</h1>
+    <p>Preview area untuk melihat style CSS yang dijalankan.</p>
+    <button>Contoh Tombol</button>
+    <div class="card">Contoh elemen .card</div>
+  </main>
+</body>
+</html>`;
+  }
+
+  if (normalizedLanguage === 'python' || normalizedLanguage === 'py') {
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin: 0; padding: 16px; background: #0f172a; color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .status { color: #93c5fd; margin-bottom: 12px; }
+    pre { white-space: pre-wrap; line-height: 1.5; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+</head>
+<body>
+  <div class="status" id="status">Loading Python runtime...</div>
+  <pre id="output"></pre>
+  <script>
+    const code = ${JSON.stringify(code)};
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+    const write = (text = '') => { output.textContent += String(text) + '\\n'; };
+
+    (async () => {
+      try {
+        const pyodide = await loadPyodide();
+        pyodide.setStdout({ batched: write });
+        pyodide.setStderr({ batched: write });
+        status.textContent = 'Running Python...';
+        await pyodide.runPythonAsync(code);
+        status.textContent = 'Done';
+      } catch (error) {
+        status.textContent = 'Error';
+        write(error && error.message ? error.message : error);
+      }
+    })();
+  </script>
+</body>
+</html>`;
+  }
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin: 0; padding: 16px; background: #0f172a; color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { white-space: pre-wrap; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <pre id="output"></pre>
+  <script>
+    const output = document.getElementById('output');
+    const log = (...args) => {
+      output.textContent += args.map((item) => {
+        if (typeof item === 'string') return item;
+        try { return JSON.stringify(item, null, 2); } catch { return String(item); }
+      }).join(' ') + '\\n';
+    };
+    console.log = log;
+    console.error = log;
+    console.warn = log;
+    try {
+      ${code}
+    } catch (error) {
+      log(error && error.message ? error.message : error);
+    }
+  </script>
+</body>
+</html>`;
+}
+
+const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, onRunCode }) => (
   <div className="my-4 max-w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-    <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2">
       <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {language || 'kode'}
       </span>
-      <CopyButton
-        text={code}
-        label="Salin kode"
-        className="text-slate-600 hover:bg-slate-100"
-      />
+      <div className="flex items-center gap-1.5">
+        {onRunCode && canRunCode(code, language) && (
+          <button
+            type="button"
+            onClick={() => onRunCode(code, language)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+            title="Jalankan kode"
+            aria-label="Jalankan kode"
+          >
+            <Play size={14} fill="currentColor" />
+            <span>Run</span>
+          </button>
+        )}
+        <CopyButton
+          text={code}
+          label="Salin kode"
+          className="text-slate-600 hover:bg-slate-100"
+        />
+      </div>
     </div>
     <pre className="m-0 max-h-none overflow-x-auto whitespace-pre bg-transparent p-4 text-sm leading-relaxed">
       <code>{code}</code>
@@ -308,6 +441,7 @@ const PreviewLink: React.FC<PreviewLinkProps> = ({ href = '', children }) => {
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isModel = message.role === 'model';
   const [typedWordCount, setTypedWordCount] = useState(0);
+  const [codePreview, setCodePreview] = useState<{ code: string; language?: string } | null>(null);
   const shouldAnimate = isModel && message.animateTyping && message.text;
   const words = useMemo(() => message.text.split(/(\s+)/), [message.text]);
   const renderedText = shouldAnimate ? words.slice(0, typedWordCount).join('') : message.text;
@@ -411,7 +545,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                     );
                   }
 
-                  return <CodeBlock code={code} language={language} />;
+                  return <CodeBlock code={code} language={language} onRunCode={(codeToRun, codeLanguage) => setCodePreview({ code: codeToRun, language: codeLanguage })} />;
                 },
                 a: ({ href, children }) => <PreviewLink href={href}>{children}</PreviewLink>,
               }}
@@ -446,6 +580,33 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           )}
         </div>
       </div>
+      {codePreview && (
+        <div className="fixed inset-0 z-50 flex bg-slate-950/70 p-3 backdrop-blur-sm md:p-6">
+          <div className="relative flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-800">Run Code</p>
+                <p className="text-xs text-slate-500">Hasil jalankan kode</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCodePreview(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                title="Tutup preview"
+                aria-label="Tutup preview"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <iframe
+              title="Run Code"
+              srcDoc={buildRunnerDocument(codePreview.code, codePreview.language)}
+              sandbox="allow-scripts allow-forms allow-modals"
+              className="min-h-0 flex-1 bg-white"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
