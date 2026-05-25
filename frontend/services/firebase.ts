@@ -65,6 +65,7 @@ export const ensureUserDocument = async (user: User) => {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
+      phoneNumber: user.phoneNumber,
       photoURL: user.photoURL,
       createdAt: user.metadata.creationTime ? new Date(user.metadata.creationTime).toISOString() : now,
       updatedAt: now

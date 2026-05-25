@@ -8,7 +8,12 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-const root = ReactDOM.createRoot(rootElement);
+const rootContainer = rootElement as HTMLElement & {
+  _putraAiRoot?: ReturnType<typeof ReactDOM.createRoot>;
+};
+const root = rootContainer._putraAiRoot ?? ReactDOM.createRoot(rootElement);
+rootContainer._putraAiRoot = root;
+
 root.render(
   <React.StrictMode>
     <App />

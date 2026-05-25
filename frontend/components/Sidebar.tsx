@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, KeyRound, MessageSquare, Mic2, Package, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, KeyRound, MessageSquare, Mic2, Package, Plus, X } from 'lucide-react';
 import { ChatSession } from '../types';
 
-export type AppView = 'chat' | 'voice';
+export type AppView = 'chat' | 'voice' | 'ppt';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onNewChat: () => void;
   onOpenVoice: () => void;
+  onOpenPpt: () => void;
   activeView: AppView;
   history: ChatSession[];
   currentSessionId: string | null;
@@ -21,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose, 
   onNewChat, 
   onOpenVoice,
+  onOpenPpt,
   activeView,
   history, 
   currentSessionId, 
@@ -99,6 +101,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Mic2 size={16} className="flex-shrink-0 opacity-75" />
                 <span className="text-sm font-medium truncate">Sorea Voice</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenPpt}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
+                  activeView === 'ppt'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'text-slate-700 hover:bg-slate-200/70'
+                }`}
+              >
+                <FileText size={16} className="flex-shrink-0 opacity-75" />
+                <span className="text-sm font-medium truncate">Putra PPT</span>
               </button>
             </div>
           </div>

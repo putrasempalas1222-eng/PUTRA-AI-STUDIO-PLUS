@@ -28,14 +28,46 @@ class PutraAiService {
     // The Putra API is stateless from the frontend perspective.
   }
 
+  private buildHistoryText(message: Pick<Message, 'role' | 'text' | 'attachments' | 'mode'>) {
+    const text = message.text?.trim() || '';
+    const imageAttachments = message.attachments?.filter((attachment) => attachment.mimeType.startsWith('image/')) || [];
+    const fileAttachments = message.attachments?.filter((attachment) => !attachment.mimeType.startsWith('image/')) || [];
+
+    if (message.role === 'user' && imageAttachments.length > 0) {
+      const imageNames = imageAttachments.map((attachment) => attachment.name).join(', ');
+      return [
+        `[User mengirim gambar: ${imageNames}]`,
+        text ? `Pertanyaan user tentang gambar: ${text}` : 'User meminta analisis gambar.',
+      ].join('\n');
+    }
+
+    if (message.role === 'user' && fileAttachments.length > 0) {
+      const fileNames = fileAttachments.map((attachment) => attachment.name).join(', ');
+      return [
+        `[User mengirim file: ${fileNames}]`,
+        text ? `Pertanyaan user tentang file: ${text}` : 'User meminta analisis file.',
+      ].join('\n');
+    }
+
+    if (message.role === 'model' && message.mode === 'vision' && text) {
+      return `[Hasil analisis gambar oleh PUTRA AI PLUS]\n${text}`;
+    }
+
+    return text;
+  }
+
   public async sendMessage(text: string, attachments: Attachment[] = [], history: Pick<Message, 'role' | 'text'>[] = []): Promise<PutraAiResponse> {
     try {
       const conversationHistory = history
-        .filter((message) => message.text?.trim())
-        .slice(-12)
         .map((message) => ({
           role: message.role,
-          text: message.text.trim().slice(0, 4000),
+          text: this.buildHistoryText(message),
+        }))
+        .filter((message) => message.text.trim())
+        .slice(-16)
+        .map((message) => ({
+          role: message.role,
+          text: message.text.trim().slice(0, 6000),
         }));
 
       const response = await fetch(getChatApiUrl(), {

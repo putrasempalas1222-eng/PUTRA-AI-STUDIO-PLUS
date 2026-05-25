@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Message } from '../types';
+import { Attachment, Message } from '../types';
 import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { downloadDocx } from '../services/docx';
@@ -56,6 +56,30 @@ const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity
 const FENCED_CODE_BLOCK_PATTERN = /(```[\s\S]*?```)/g;
 const INLINE_CODE_PATTERN = /(`[^`\n]+`)/g;
 const BARE_URL_PATTERN = /https?:\/\/[^\s<>\])]+/g;
+
+const toDataUrl = (attachment: Attachment) => {
+  if (!attachment.data) return '';
+  if (attachment.data.startsWith('data:')) return attachment.data;
+  return `data:${attachment.mimeType || 'application/octet-stream'};base64,${attachment.data}`;
+};
+
+const base64ToBytes = (base64Data: string) => {
+  const cleanBase64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+  const binary = window.atob(cleanBase64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+};
+
+const decodeTextAttachment = (attachment: Attachment) => {
+  if (!attachment.data) return '';
+  const bytes = base64ToBytes(attachment.data);
+  return new TextDecoder('utf-8').decode(bytes);
+};
 
 function getLinkLabel(url: string) {
   try {
@@ -468,10 +492,146 @@ const PreviewLink: React.FC<PreviewLinkProps> = ({ href = '', children }) => {
   );
 };
 
+interface AttachmentPreviewModalProps {
+  attachment: Attachment;
+  onClose: () => void;
+}
+
+const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachment, onClose }) => {
+  const [docxText, setDocxText] = useState('');
+  const [docxStatus, setDocxStatus] = useState('');
+  const dataUrl = toDataUrl(attachment);
+  const mimeType = attachment.mimeType || '';
+  const lowerName = attachment.name.toLowerCase();
+  const isImage = mimeType.startsWith('image/');
+  const isPdf = mimeType === 'application/pdf' || lowerName.endsWith('.pdf');
+  const isText = mimeType.startsWith('text/') || lowerName.endsWith('.txt') || lowerName.endsWith('.md') || lowerName.endsWith('.csv');
+  const isDocx = mimeType.includes('wordprocessingml.document') || lowerName.endsWith('.docx');
+  const textContent = useMemo(() => {
+    if (!attachment.data || !isText) return '';
+
+    try {
+      return decodeTextAttachment(attachment);
+    } catch {
+      return 'File teks tidak bisa dibaca di preview.';
+    }
+  }, [attachment, isText]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const readDocx = async () => {
+      if (!attachment.data || !isDocx) return;
+
+      setDocxStatus('Membaca isi Word...');
+      try {
+        const mammoth = await import('mammoth/mammoth.browser');
+        const result = await mammoth.extractRawText({
+          arrayBuffer: base64ToBytes(attachment.data).buffer,
+        });
+
+        if (!cancelled) {
+          setDocxText(result.value || 'Tidak ada teks yang terbaca dari file Word ini.');
+          setDocxStatus('');
+        }
+      } catch {
+        if (!cancelled) {
+          setDocxStatus('Isi Word belum bisa ditampilkan di preview.');
+        }
+      }
+    };
+
+    readDocx();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment, isDocx]);
+
+  const renderPreview = () => {
+    if (!attachment.data) {
+      return (
+        <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+          Isi file penuh tidak tersimpan di riwayat untuk menjaga ukuran data. Upload ulang file jika ingin melihat preview lengkap.
+        </div>
+      );
+    }
+
+    if (isImage) {
+      return (
+        <div className="flex min-h-[260px] items-center justify-center rounded-xl bg-slate-50 p-3">
+          <img src={dataUrl} alt={attachment.name} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+        </div>
+      );
+    }
+
+    if (isPdf) {
+      return (
+        <iframe
+          title={attachment.name}
+          src={dataUrl}
+          className="h-[70vh] w-full rounded-xl border border-slate-200 bg-white"
+        />
+      );
+    }
+
+    if (isText) {
+      return (
+        <pre className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800 whitespace-pre-wrap">
+          {textContent}
+        </pre>
+      );
+    }
+
+    if (isDocx) {
+      return (
+        <pre className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800 whitespace-pre-wrap">
+          {docxStatus || docxText}
+        </pre>
+      );
+    }
+
+    return (
+      <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+        Preview untuk format file ini belum didukung.
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex bg-slate-950/40 p-3 backdrop-blur-sm md:p-6">
+      <div className="relative flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <FileText size={18} className="shrink-0 text-blue-600" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-800">{attachment.name}</p>
+              <p className="truncate text-xs text-slate-500">{mimeType || 'File'}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            title="Tutup preview"
+            aria-label="Tutup preview"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {renderPreview()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingComplete }) => {
   const isModel = message.role === 'model';
   const [typedWordCount, setTypedWordCount] = useState(0);
   const [codePreview, setCodePreview] = useState<{ code: string; language?: string } | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null);
   const shouldAnimate = isModel && message.animateTyping && message.text;
   const words = useMemo(() => message.text.split(/(\s+)/), [message.text]);
   const renderedText = shouldAnimate ? words.slice(0, typedWordCount).join('') : message.text;
@@ -519,10 +679,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
           {message.attachments && message.attachments.length > 0 && (
             <div className="flex flex-wrap justify-end gap-2 mb-1">
               {message.attachments.map(att => (
-                <div key={att.id} className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm max-w-[250px]">
+                <button
+                  key={att.id}
+                  type="button"
+                  onClick={() => setAttachmentPreview(att)}
+                  className="flex max-w-[250px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50"
+                  title="Lihat file"
+                >
                   {getFileIcon(att.mimeType)}
                   <span className="text-xs text-slate-700 truncate">{att.name}</span>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -541,6 +707,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
             </>
           )}
         </div>
+        {attachmentPreview && (
+          <AttachmentPreviewModal
+            attachment={attachmentPreview}
+            onClose={() => setAttachmentPreview(null)}
+          />
+        )}
       </div>
     );
   }

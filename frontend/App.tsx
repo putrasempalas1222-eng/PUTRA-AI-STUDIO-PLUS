@@ -7,6 +7,7 @@ import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { Sidebar, AppView } from './components/Sidebar';
 import { SoreaVoice } from './components/SoreaVoice';
+import { PutraPpt } from './components/PutraPpt';
 import { AuthModal, AuthMode } from './components/AuthModal';
 import { Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
 
@@ -84,6 +85,67 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
   return THINKING_STEPS;
 };
 
+const isImageGenerationStepSet = (steps: string[]) => steps === IMAGE_GENERATION_STEPS;
+
+const ImageGenerationLoader: React.FC<{ step: string }> = ({ step }) => (
+  <div className="flex w-full mb-8 justify-start">
+    <div className="flex max-w-[92%] flex-row items-start gap-4">
+      <div className="flex-shrink-0 mt-1">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
+          <img
+            src={APP_ICON_URL}
+            alt="PUTRA AI STUDIO"
+            className="h-6 w-6 object-contain"
+          />
+        </div>
+      </div>
+
+      <div className="w-full max-w-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800">Membuat gambar</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{step}</p>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+            <Sparkles size={17} />
+          </div>
+        </div>
+
+        <div className="relative h-64 overflow-hidden bg-slate-50">
+          <div
+            className="absolute inset-0 opacity-70"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle, rgba(37, 99, 235, 0.20) 1.2px, transparent 1.2px)',
+              backgroundSize: '18px 18px',
+              maskImage:
+                'radial-gradient(circle at 34% 55%, black 0%, black 34%, transparent 68%)',
+              WebkitMaskImage:
+                'radial-gradient(circle at 34% 55%, black 0%, black 34%, transparent 68%)',
+            }}
+          />
+          <div className="absolute left-8 top-8 h-28 w-28 rounded-full border border-blue-200 bg-blue-100/50 blur-sm" />
+          <div className="absolute bottom-8 right-9 h-24 w-24 rounded-full border border-rose-200 bg-rose-100/50 blur-sm" />
+          <div className="absolute inset-x-8 bottom-8 overflow-hidden rounded-full bg-white/90 p-1 shadow-sm ring-1 ring-slate-200">
+            <div className="h-2 w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-rose-500" />
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="grid grid-cols-4 gap-2">
+              {Array.from({ length: 16 }).map((_, index) => (
+                <span
+                  key={index}
+                  className="h-2 w-2 rounded-full bg-slate-400/60 animate-pulse"
+                  style={{ animationDelay: `${index * 65}ms` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const App: React.FC = () => {
   // Chat State
   const [messages, setMessages] = useState<Message[]>([]);
@@ -131,9 +193,9 @@ const App: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        setAuthMode('hidden');
         try {
           await ensureUserDocument(currentUser);
+          setAuthMode(currentUser.phoneNumber ? 'hidden' : 'phone');
           await loadHistory(currentUser.uid);
         } catch (err) {
           setError(err instanceof Error ? `Kesalahan Firestore: ${err.message}` : 'Kesalahan Firestore: gagal memuat riwayat chat.');
@@ -320,6 +382,12 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
+  const handleOpenPpt = () => {
+    setActiveView('ppt');
+    setError(null);
+    setIsSidebarOpen(false);
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     setShowUserMenu(false);
@@ -337,7 +405,8 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         onNewChat={handleNewChat}
-                onOpenVoice={handleOpenVoice}
+        onOpenVoice={handleOpenVoice}
+        onOpenPpt={handleOpenPpt}
         activeView={activeView}
         history={chatHistory}
         currentSessionId={currentSessionId}
@@ -417,6 +486,8 @@ const App: React.FC = () => {
               setError('Silakan masuk atau buat akun sebelum menggunakan Sorea Voice.');
             }}
           />
+        ) : activeView === 'ppt' ? (
+          <PutraPpt />
         ) : (
         <main className={`relative flex-1 min-h-0 overflow-y-auto overscroll-contain ${isEmptyChat ? '' : 'pb-64 md:pb-56'}`}>
           {isEmptyChat ? (
@@ -470,7 +541,10 @@ const App: React.FC = () => {
               ))}
               
               {isLoading && (
-                <div className="flex w-full mb-8 justify-start">
+                isImageGenerationStepSet(activeThinkingSteps) ? (
+                  <ImageGenerationLoader step={activeThinkingSteps[thinkingStep]} />
+                ) : (
+                  <div className="flex w-full mb-8 justify-start">
                   <div className="flex max-w-[90%] flex-row items-start gap-4">
                     <div className="flex-shrink-0 mt-1">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100 animate-pulse">
@@ -495,6 +569,7 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                )
               )}
               
               {error && (
@@ -534,9 +609,9 @@ const App: React.FC = () => {
       {/* Auth Modal */}
       <AuthModal 
         mode={authMode} 
-        onClose={() => user && setAuthMode('hidden')} 
+        onClose={() => user?.phoneNumber && setAuthMode('hidden')} 
         onChangeMode={setAuthMode} 
-        canClose={!!user}
+        canClose={!!user?.phoneNumber}
       />
 
     </div>
