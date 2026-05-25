@@ -233,7 +233,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const aiResponse = await geminiService.sendMessage(text, attachments);
+      const aiResponse = await geminiService.sendMessage(text, attachments, messages);
       
       const newModelMessage: Message = {
         id: (Date.now() + 1).toString(),

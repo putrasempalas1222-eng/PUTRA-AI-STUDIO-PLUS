@@ -1,4 +1,4 @@
-import { Attachment } from '../types';
+import { Attachment, Message } from '../types';
 
 export interface PutraAiResponse {
   text: string;
@@ -28,8 +28,16 @@ class PutraAiService {
     // The Putra API is stateless from the frontend perspective.
   }
 
-  public async sendMessage(text: string, attachments: Attachment[] = []): Promise<PutraAiResponse> {
+  public async sendMessage(text: string, attachments: Attachment[] = [], history: Pick<Message, 'role' | 'text'>[] = []): Promise<PutraAiResponse> {
     try {
+      const conversationHistory = history
+        .filter((message) => message.text?.trim())
+        .slice(-12)
+        .map((message) => ({
+          role: message.role,
+          text: message.text.trim().slice(0, 4000),
+        }));
+
       const response = await fetch(getChatApiUrl(), {
         method: 'POST',
         headers: {
@@ -39,6 +47,7 @@ class PutraAiService {
           prompt: text.trim(),
           deviceId: getDeviceId(),
           attachments,
+          history: conversationHistory,
         }),
       });
 

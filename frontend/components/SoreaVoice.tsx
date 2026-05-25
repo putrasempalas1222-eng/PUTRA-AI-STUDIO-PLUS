@@ -170,7 +170,8 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
           '',
           `User: ${cleanText}`,
         ].join('\n'),
-        []
+        [],
+        messages
       );
 
       const modelMessage: VoiceMessage = {
