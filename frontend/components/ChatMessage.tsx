@@ -51,6 +51,76 @@ const downloadImage = async (src: string, filename: string) => {
 };
 
 const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09';
+const FENCED_CODE_BLOCK_PATTERN = /(```[\s\S]*?```)/g;
+const INLINE_CODE_PATTERN = /(`[^`\n]+`)/g;
+const BARE_URL_PATTERN = /https?:\/\/[^\s<>)]+/g;
+
+function getLinkLabel(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const firstPath = parsed.pathname.split('/').filter(Boolean)[0];
+
+    if (host.includes('arxiv.org')) return 'arXiv';
+    if (host.includes('doi.org')) return 'DOI';
+    if (host.includes('scholar.google')) return 'Google Scholar';
+    if (host.includes('researchgate.net')) return 'ResearchGate';
+    if (host.includes('semanticscholar.org')) return 'Semantic Scholar';
+    if (host.includes('github.com')) return 'GitHub';
+    if (host.includes('youtube.com') || host.includes('youtu.be')) return 'YouTube';
+
+    return firstPath ? host : host;
+  } catch {
+    return 'Link';
+  }
+}
+
+function getLinkPreviewTitle(url: string, fallback: string) {
+  if (fallback && fallback !== url) return fallback;
+
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const pathParts = parsed.pathname
+      .split('/')
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(' / ');
+
+    return pathParts ? `${host} / ${pathParts}` : host;
+  } catch {
+    return fallback || url;
+  }
+}
+
+function linkifyBareUrls(markdown: string) {
+  return markdown
+    .split(FENCED_CODE_BLOCK_PATTERN)
+    .map((blockPart) => {
+      if (blockPart.startsWith('```')) return blockPart;
+
+      return blockPart
+        .split(INLINE_CODE_PATTERN)
+        .map((inlinePart) => {
+          if (inlinePart.startsWith('`')) return inlinePart;
+
+          return inlinePart.replace(BARE_URL_PATTERN, (url, offset, source) => {
+            const before = source.slice(Math.max(0, offset - 2), offset);
+            const previousChar = source[offset - 1] || '';
+
+            if (before === '](' || previousChar === '<') {
+              return url;
+            }
+
+            const trailing = url.match(/[.,;:!?]+$/)?.[0] || '';
+            const cleanUrl = trailing ? url.slice(0, -trailing.length) : url;
+            return `[${getLinkLabel(cleanUrl)}](${cleanUrl})${trailing}`;
+          });
+        })
+        .join('');
+    })
+    .join('');
+}
 
 interface CopyButtonProps {
   text: string;
@@ -187,12 +257,61 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => (
   </div>
 );
 
+interface PreviewLinkProps {
+  href?: string;
+  children: React.ReactNode;
+}
+
+const PreviewLink: React.FC<PreviewLinkProps> = ({ href = '', children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const childText = React.Children.toArray(children).join('').trim();
+  const label = href ? getLinkLabel(href) : childText || 'Link';
+  const previewTitle = href ? getLinkPreviewTitle(href, childText) : childText;
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLAnchorElement>) => {
+    if (event.pointerType === 'mouse') return;
+    if (!isOpen) {
+      event.preventDefault();
+      setIsOpen(true);
+    }
+  };
+
+  return (
+    <span
+      className="relative inline-flex align-baseline"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      onFocus={() => setIsOpen(true)}
+      onBlur={() => setIsOpen(false)}
+    >
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onPointerUp={handlePointerUp}
+        className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 no-underline shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+        <span className="truncate">{label}</span>
+        <span aria-hidden="true" className="text-[10px] leading-none">↗</span>
+      </a>
+      {isOpen && href && (
+        <span className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-[min(78vw,360px)] rounded-xl bg-slate-900 px-4 py-3 text-left text-white shadow-xl ring-1 ring-black/10">
+          <span className="block text-xs font-semibold text-blue-200">{label}</span>
+          <span className="mt-1 block text-sm font-semibold leading-snug">{previewTitle}</span>
+          <span className="mt-2 block truncate text-xs text-slate-300">{href}</span>
+        </span>
+      )}
+    </span>
+  );
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isModel = message.role === 'model';
   const [typedWordCount, setTypedWordCount] = useState(0);
   const shouldAnimate = isModel && message.animateTyping && message.text;
   const words = useMemo(() => message.text.split(/(\s+)/), [message.text]);
   const renderedText = shouldAnimate ? words.slice(0, typedWordCount).join('') : message.text;
+  const renderedMarkdown = useMemo(() => linkifyBareUrls(renderedText), [renderedText]);
   const isAnimationComplete = !shouldAnimate || typedWordCount >= words.length;
 
   useEffect(() => {
@@ -294,9 +413,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
                   return <CodeBlock code={code} language={language} />;
                 },
+                a: ({ href, children }) => <PreviewLink href={href}>{children}</PreviewLink>,
               }}
             >
-              {renderedText}
+              {renderedMarkdown}
             </ReactMarkdown>
           </div>
           {message.imageBase64 && isAnimationComplete && (
