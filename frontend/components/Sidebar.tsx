@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 <Mic2 size={16} className="flex-shrink-0 opacity-75" />
-                <span className="text-sm font-medium truncate">Sorea Voice</span>
+                <span className="text-sm font-medium truncate">Putra Voice</span>
               </button>
               <button
                 type="button"

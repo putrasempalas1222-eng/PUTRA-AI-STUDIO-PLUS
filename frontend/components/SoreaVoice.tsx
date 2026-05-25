@@ -161,7 +161,7 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
     try {
       const aiResponse = await geminiService.sendMessage(
         [
-          'Mode: Sorea Voice.',
+          'Mode: Putra Voice.',
           'Jawab sebagai asisten suara yang natural, ringkas, dan langsung ke inti.',
           'Jangan membuka jawaban dengan sapaan seperti "Halo", "Hai", atau "Halo lagi" kecuali user memang menyapa terlebih dahulu.',
           'Jangan menyebut bahwa kamu sedang dalam mode voice.',
@@ -184,7 +184,7 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
       speak(aiResponse.text, modelMessage.id);
     } catch (err) {
       setStatus('idle');
-      setError(err instanceof Error ? err.message : 'Sorea Voice gagal mendapatkan jawaban.');
+      setError(err instanceof Error ? err.message : 'Putra Voice gagal mendapatkan jawaban.');
     }
   };
 
@@ -289,9 +289,9 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
   const statusText = isListening
     ? 'Mendengarkan suara Anda'
     : isThinking
-      ? 'Sorea sedang menyusun jawaban'
+      ? 'Putra sedang menyusun jawaban'
       : isSpeaking
-        ? 'Sorea sedang berbicara'
+        ? 'Putra sedang berbicara'
         : 'Tekan mic untuk mulai bicara';
 
   const renderVoiceText = (message: VoiceMessage) => {
@@ -335,17 +335,17 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
         <section className="flex flex-1 min-h-0 flex-col items-center">
           <div className="flex w-full max-w-3xl flex-col items-center text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
-              <img src={APP_ICON_URL} alt="Sorea Voice" className="h-10 w-10 object-contain" />
+              <img src={APP_ICON_URL} alt="Putra Voice" className="h-10 w-10 object-contain" />
             </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-slate-200">
               <Wand2 size={14} />
-              Sorea Voice
+              Putra Voice
             </div>
             <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-800 md:text-5xl">
               Ngobrol langsung dengan AI
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500 md:text-base">
-              Bicara natural, Sorea mengubah suara menjadi teks, memahami konteks, lalu menjawab kembali dengan suara.
+              Bicara natural, Putra mengubah suara menjadi teks, memahami konteks, lalu menjawab kembali dengan suara.
             </p>
           </div>
 
@@ -372,7 +372,7 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
             <div ref={conversationRef} className="flex-1 overflow-y-auto px-4 py-4">
               {messages.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
-                  Mulai dengan menekan mic, misalnya: "Sorea, bantu saya cari ide konten hari ini."
+                  Mulai dengan menekan mic, misalnya: "Putra, bantu saya cari ide konten hari ini."
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -397,7 +397,7 @@ export const SoreaVoice: React.FC<SoreaVoiceProps> = ({ isLoggedIn, onRequireLog
                       <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500" />
                       <span className="h-2 w-2 animate-bounce rounded-full bg-violet-500 [animation-delay:150ms]" />
                       <span className="h-2 w-2 animate-bounce rounded-full bg-rose-500 [animation-delay:300ms]" />
-                      Sorea berpikir...
+                      Putra berpikir...
                     </div>
                   )}
                   <div ref={messagesEndRef} />

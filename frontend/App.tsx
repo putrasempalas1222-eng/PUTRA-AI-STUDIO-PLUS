@@ -483,7 +483,7 @@ const App: React.FC = () => {
             isLoggedIn={!!user}
             onRequireLogin={() => {
               setAuthMode('login');
-              setError('Silakan masuk atau buat akun sebelum menggunakan Sorea Voice.');
+              setError('Silakan masuk atau buat akun sebelum menggunakan Putra Voice.');
             }}
           />
         ) : activeView === 'ppt' ? (
