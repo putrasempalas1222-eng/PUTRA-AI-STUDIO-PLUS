@@ -384,7 +384,7 @@ const App: React.FC = () => {
             }}
           />
         ) : (
-        <main className={`relative flex-1 min-h-0 overflow-y-auto overscroll-contain ${isEmptyChat ? '' : 'pb-48 md:pb-44'}`}>
+        <main className={`relative flex-1 min-h-0 overflow-y-auto overscroll-contain ${isEmptyChat ? '' : 'pb-64 md:pb-56'}`}>
           {isEmptyChat ? (
             // Empty State / Greeting
             <div className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
@@ -469,7 +469,7 @@ const App: React.FC = () => {
                 </div>
               )}
               
-              <div ref={messagesEndRef} className="h-4" />
+              <div ref={messagesEndRef} className="h-36 md:h-32" />
             </div>
           )}
         </main>
