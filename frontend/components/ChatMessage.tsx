@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Message } from '../types';
-import { Check, Copy, Download, FileText, Image as ImageIcon, Music, File, Volume2, Square } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Volume2, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatMessageProps {
@@ -53,7 +53,7 @@ const downloadImage = async (src: string, filename: string) => {
 const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09';
 const FENCED_CODE_BLOCK_PATTERN = /(```[\s\S]*?```)/g;
 const INLINE_CODE_PATTERN = /(`[^`\n]+`)/g;
-const BARE_URL_PATTERN = /https?:\/\/[^\s<>)]+/g;
+const BARE_URL_PATTERN = /https?:\/\/[^\s<>\])]+/g;
 
 function getLinkLabel(url: string) {
   try {
@@ -114,7 +114,7 @@ function linkifyBareUrls(markdown: string) {
 
             const trailing = url.match(/[.,;:!?]+$/)?.[0] || '';
             const cleanUrl = trailing ? url.slice(0, -trailing.length) : url;
-            return `[${getLinkLabel(cleanUrl)}](${cleanUrl})${trailing}`;
+            return `<${cleanUrl}>${trailing}`;
           });
         })
         .join('');
@@ -265,7 +265,7 @@ interface PreviewLinkProps {
 const PreviewLink: React.FC<PreviewLinkProps> = ({ href = '', children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const childText = React.Children.toArray(children).join('').trim();
-  const label = href ? getLinkLabel(href) : childText || 'Link';
+  const label = href ? getLinkLabel(href) : childText.replace(/^\[|\]$/g, '') || 'Link';
   const previewTitle = href ? getLinkPreviewTitle(href, childText) : childText;
 
   const handlePointerUp = (event: React.PointerEvent<HTMLAnchorElement>) => {
@@ -292,7 +292,7 @@ const PreviewLink: React.FC<PreviewLinkProps> = ({ href = '', children }) => {
         className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 no-underline shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
       >
         <span className="truncate">{label}</span>
-        <span aria-hidden="true" className="text-[10px] leading-none">↗</span>
+        <ExternalLink size={12} aria-hidden="true" className="shrink-0" />
       </a>
       {isOpen && href && (
         <span className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-[min(78vw,360px)] rounded-xl bg-slate-900 px-4 py-3 text-left text-white shadow-xl ring-1 ring-black/10">
