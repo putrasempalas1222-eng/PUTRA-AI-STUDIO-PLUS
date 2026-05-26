@@ -1,0 +1,7 @@
+{
+  "name": "PUTRA AI PLUS",
+  "description": "Asisten AI canggih dengan antarmuka chat yang rapi, integrasi API, serta Firebase untuk riwayat chat dan autentikasi.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
