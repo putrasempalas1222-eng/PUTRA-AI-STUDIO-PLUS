@@ -10,7 +10,8 @@ const DEVICE_ID_KEY = 'putra_ai_studio_device_id';
 const DEFAULT_API_BASE_URL = 'https://api-mzmdqh3n6a-uc.a.run.app';
 
 function getChatApiUrl() {
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+  const defaultApiBaseUrl = import.meta.env.DEV ? '' : DEFAULT_API_BASE_URL;
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl).replace(/\/$/, '');
   return `${apiBaseUrl}/api/chat`;
 }
 
