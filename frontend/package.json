@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.6.0",
+    "fflate": "^0.8.2",
     "firebase": "^12.13.0",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",

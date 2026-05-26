@@ -23,6 +23,22 @@ function getDeviceId() {
   return newId;
 }
 
+function getUserFacingError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    message.includes('4006') ||
+    normalizedMessage.includes('daily free allocation') ||
+    normalizedMessage.includes('10,000 neurons') ||
+    normalizedMessage.includes('workers paid plan')
+  ) {
+    return 'PUTRA AI PLUS sedang maintenance. Silakan coba lagi beberapa saat nanti.';
+  }
+
+  return message || 'Gagal mendapatkan balasan dari PUTRA AI PLUS. Silakan coba lagi nanti.';
+}
+
 class PutraAiService {
   public initChat() {
     // The Putra API is stateless from the frontend perspective.
@@ -77,6 +93,7 @@ class PutraAiService {
         },
         body: JSON.stringify({
           prompt: text.trim(),
+          model: 'PutraAi-V1',
           deviceId: getDeviceId(),
           attachments,
           history: conversationHistory,
@@ -96,7 +113,7 @@ class PutraAiService {
       };
     } catch (error) {
       console.error('Gagal berkomunikasi dengan Putra API:', error);
-      throw new Error(error instanceof Error ? error.message : 'Gagal mendapatkan balasan dari PUTRA AI PLUS. Silakan coba lagi nanti.');
+      throw new Error(getUserFacingError(error));
     }
   }
 

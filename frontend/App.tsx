@@ -8,6 +8,8 @@ import { ChatInput } from './components/ChatInput';
 import { Sidebar, AppView } from './components/Sidebar';
 import { SoreaVoice } from './components/SoreaVoice';
 import { PutraPpt } from './components/PutraPpt';
+import { PutraPackages } from './components/PutraPackages';
+import { PutraConvert } from './components/PutraConvert';
 import { AuthModal, AuthMode } from './components/AuthModal';
 import { Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
 
@@ -43,16 +45,24 @@ const IMAGE_GENERATION_KEYWORDS = [
   'generate gambar',
   'hasilkan gambar',
   'bikin gambar',
-  'gambar',
-  'ilustrasi',
-  'poster',
-  'logo',
-  'desain',
-  'render',
-  'draw',
+  'buat ilustrasi',
+  'buatkan ilustrasi',
+  'generate ilustrasi',
+  'buat poster',
+  'buatkan poster',
+  'generate poster',
+  'buat logo',
+  'buatkan logo',
+  'generate logo',
+  'buat desain',
+  'buatkan desain',
+  'render gambar',
+  'draw image',
   'generate image',
   'create image',
 ];
+
+const IMAGE_GENERATION_PATTERN = /\b(buat|buatkan|bikin|generate|hasilkan|render|draw|create)\b[\s\S]{0,80}\b(gambar|image|ilustrasi|poster|logo|desain|visual)\b/i;
 
 const DOCX_REQUEST_PATTERN = /\b(docx|word|ms word|microsoft word|file makalah|dokumen makalah|buatkan makalah|makalah|download file|file doc)\b/i;
 
@@ -78,7 +88,10 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
   }
 
   const normalizedText = text.toLowerCase();
-  if (IMAGE_GENERATION_KEYWORDS.some((keyword) => normalizedText.includes(keyword))) {
+  if (
+    IMAGE_GENERATION_PATTERN.test(text) ||
+    IMAGE_GENERATION_KEYWORDS.some((keyword) => normalizedText.includes(keyword))
+  ) {
     return IMAGE_GENERATION_STEPS;
   }
 
@@ -86,6 +99,43 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
 };
 
 const isImageGenerationStepSet = (steps: string[]) => steps === IMAGE_GENERATION_STEPS;
+
+const ThinkingLoader: React.FC<{ step: string; steps: string[] }> = ({ step, steps }) => {
+  const title = steps === IMAGE_ANALYSIS_STEPS
+    ? 'Menganalisis gambar'
+    : steps === FILE_ANALYSIS_STEPS
+      ? 'Menganalisis file'
+      : 'Memikirkan jawaban';
+
+  return (
+    <div className="flex w-full mb-8 justify-start">
+      <div className="flex max-w-[90%] flex-row items-start gap-4">
+        <div className="flex-shrink-0 mt-1">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
+            <img
+              src={APP_ICON_URL}
+              alt="PUTRA AI STUDIO"
+              className="h-6 w-6 object-contain"
+            />
+          </div>
+        </div>
+        <div className="rounded-2xl rounded-tl-sm border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-3 text-slate-700">
+            <div className="flex items-center gap-1.5" aria-hidden="true">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{title}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{step}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ImageGenerationLoader: React.FC<{ step: string }> = ({ step }) => (
   <div className="flex w-full mb-8 justify-start">
@@ -376,6 +426,12 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
+  const handleOpenPackages = () => {
+    setActiveView('packages');
+    setError(null);
+    setIsSidebarOpen(false);
+  };
+
   const handleOpenVoice = () => {
     setActiveView('voice');
     setError(null);
@@ -384,6 +440,12 @@ const App: React.FC = () => {
 
   const handleOpenPpt = () => {
     setActiveView('ppt');
+    setError(null);
+    setIsSidebarOpen(false);
+  };
+
+  const handleOpenConvert = (view: 'convert-word-pdf' | 'convert-ppt-pdf') => {
+    setActiveView(view);
     setError(null);
     setIsSidebarOpen(false);
   };
@@ -405,8 +467,10 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         onNewChat={handleNewChat}
+        onOpenPackages={handleOpenPackages}
         onOpenVoice={handleOpenVoice}
         onOpenPpt={handleOpenPpt}
+        onOpenConvert={handleOpenConvert}
         activeView={activeView}
         history={chatHistory}
         currentSessionId={currentSessionId}
@@ -478,7 +542,13 @@ const App: React.FC = () => {
         </header>
 
         {/* Chat Area */}
-        {activeView === 'voice' ? (
+        {activeView === 'packages' ? (
+          <PutraPackages />
+        ) : activeView === 'convert-word-pdf' ? (
+          <PutraConvert mode="word-pdf" />
+        ) : activeView === 'convert-ppt-pdf' ? (
+          <PutraConvert mode="ppt-pdf" />
+        ) : activeView === 'voice' ? (
           <SoreaVoice
             isLoggedIn={!!user}
             onRequireLogin={() => {
@@ -544,31 +614,7 @@ const App: React.FC = () => {
                 isImageGenerationStepSet(activeThinkingSteps) ? (
                   <ImageGenerationLoader step={activeThinkingSteps[thinkingStep]} />
                 ) : (
-                  <div className="flex w-full mb-8 justify-start">
-                  <div className="flex max-w-[90%] flex-row items-start gap-4">
-                    <div className="flex-shrink-0 mt-1">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100 animate-pulse">
-                        <img
-                          src={APP_ICON_URL}
-                          alt="PUTRA AI STUDIO"
-                          className="h-6 w-6 object-contain"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1 py-1.5">
-                      <div className="inline-flex items-center gap-3 px-1 py-2 text-slate-600">
-                        <div className="flex items-center gap-1.5" aria-hidden="true">
-                          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                        </div>
-                        <span className="text-sm font-medium">
-                          {activeThinkingSteps[thinkingStep]}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <ThinkingLoader step={activeThinkingSteps[thinkingStep]} steps={activeThinkingSteps} />
                 )
               )}
               
