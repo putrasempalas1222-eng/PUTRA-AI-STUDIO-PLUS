@@ -72,7 +72,11 @@ class PutraAiService {
     return text;
   }
 
-  public async sendMessage(text: string, attachments: Attachment[] = [], history: Pick<Message, 'role' | 'text'>[] = []): Promise<PutraAiResponse> {
+  public async sendMessage(
+    text: string,
+    attachments: Attachment[] = [],
+    history: Pick<Message, 'role' | 'text' | 'attachments' | 'mode'>[] = [],
+  ): Promise<PutraAiResponse> {
     try {
       const conversationHistory = history
         .map((message) => ({
