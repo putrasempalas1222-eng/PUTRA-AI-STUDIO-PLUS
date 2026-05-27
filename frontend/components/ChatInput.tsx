@@ -75,17 +75,62 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     };
   }, []);
 
-  const fileToBase64 = (file: File | Blob): Promise<string> => {
+  const readFileAsDataUrl = (file: File | Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
-        const result = reader.result as string;
-        const base64Data = result.split(',')[1];
-        resolve(base64Data);
+        resolve(reader.result as string);
       };
       reader.onerror = error => reject(error);
     });
+  };
+
+  const dataUrlToBase64 = (dataUrl: string) => dataUrl.split(',')[1] || '';
+
+  const compressImageToBase64 = async (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {
+    const dataUrl = await readFileAsDataUrl(file);
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrlToBase64(dataUrl));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(dataUrlToBase64(canvas.toDataURL('image/jpeg', quality)));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  };
+
+  const fileToBase64 = async (file: File): Promise<{ data: string; mimeType: string }> => {
+    if (file.type.startsWith('image/')) {
+      return {
+        data: await compressImageToBase64(file),
+        mimeType: 'image/jpeg',
+      };
+    }
+
+    return {
+      data: dataUrlToBase64(await readFileAsDataUrl(file)),
+      mimeType: file.type || 'application/octet-stream',
+    };
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,12 +141,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        const base64Data = await fileToBase64(file);
+        const fileData = await fileToBase64(file);
         newAttachments.push({
           id: Date.now().toString() + i,
           name: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          data: base64Data
+          mimeType: fileData.mimeType,
+          data: fileData.data
         });
       } catch (error) {
         console.error("Gagal membaca file:", error);
