@@ -11,7 +11,7 @@ import { PutraPpt } from './components/PutraPpt';
 import { PutraPackages } from './components/PutraPackages';
 import { PutraConvert } from './components/PutraConvert';
 import { AuthModal, AuthMode } from './components/AuthModal';
-import { Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
+import { ChevronDown, Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
 
 const THINKING_STEPS = [
   'Memahami permintaan',
@@ -100,12 +100,37 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
 
 const isImageGenerationStepSet = (steps: string[]) => steps === IMAGE_GENERATION_STEPS;
 
-const ThinkingLoader: React.FC<{ step: string; steps: string[] }> = ({ step, steps }) => {
+const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: string }> = ({ step, steps, liveThinking }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const [typedText, setTypedText] = useState('');
   const title = steps === IMAGE_ANALYSIS_STEPS
     ? 'Menganalisis gambar'
     : steps === FILE_ANALYSIS_STEPS
       ? 'Menganalisis file'
       : 'Memikirkan jawaban';
+
+  const detailText = liveThinking?.trim() || 'Menghubungkan ke PUTRA AI STUDIO...';
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!detailText.startsWith(typedText)) {
+      setTypedText('');
+      return;
+    }
+
+    let index = typedText.length;
+    const timer = window.setInterval(() => {
+      index += 1;
+      setTypedText(detailText.slice(0, index));
+
+      if (index >= detailText.length) {
+        window.clearInterval(timer);
+      }
+    }, 24);
+
+    return () => window.clearInterval(timer);
+  }, [detailText, isOpen, typedText]);
 
   return (
     <div className="flex w-full mb-8 justify-start">
@@ -119,18 +144,27 @@ const ThinkingLoader: React.FC<{ step: string; steps: string[] }> = ({ step, ste
             />
           </div>
         </div>
-        <div className="rounded-2xl rounded-tl-sm border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-3 text-slate-700">
-            <div className="flex items-center gap-1.5" aria-hidden="true">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-800">{title}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{step}</p>
-            </div>
-          </div>
+        <div className="min-w-0 pt-1">
+          <button
+            type="button"
+            onClick={() => setIsOpen((open) => !open)}
+            className="flex items-center gap-2 text-left text-slate-700 transition-colors hover:text-slate-950"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            <p className="text-sm font-semibold text-slate-800">{title}</p>
+            <ChevronDown
+              size={15}
+              className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {isOpen && (
+            <p className="mt-1 min-h-5 text-sm leading-relaxed text-slate-500">
+              {typedText}
+              <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-slate-400" />
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -150,47 +184,15 @@ const ImageGenerationLoader: React.FC<{ step: string }> = ({ step }) => (
         </div>
       </div>
 
-      <div className="w-full max-w-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800">Membuat gambar</p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">{step}</p>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-            <Sparkles size={17} />
-          </div>
+      <div className="min-w-0 pt-1">
+        <div className="flex items-center gap-2 text-slate-700">
+          <Sparkles size={16} className="text-blue-600" />
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <p className="text-sm font-semibold text-slate-800">Membuat gambar</p>
         </div>
-
-        <div className="relative h-64 overflow-hidden bg-slate-50">
-          <div
-            className="absolute inset-0 opacity-70"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle, rgba(37, 99, 235, 0.20) 1.2px, transparent 1.2px)',
-              backgroundSize: '18px 18px',
-              maskImage:
-                'radial-gradient(circle at 34% 55%, black 0%, black 34%, transparent 68%)',
-              WebkitMaskImage:
-                'radial-gradient(circle at 34% 55%, black 0%, black 34%, transparent 68%)',
-            }}
-          />
-          <div className="absolute left-8 top-8 h-28 w-28 rounded-full border border-blue-200 bg-blue-100/50 blur-sm" />
-          <div className="absolute bottom-8 right-9 h-24 w-24 rounded-full border border-rose-200 bg-rose-100/50 blur-sm" />
-          <div className="absolute inset-x-8 bottom-8 overflow-hidden rounded-full bg-white/90 p-1 shadow-sm ring-1 ring-slate-200">
-            <div className="h-2 w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-rose-500" />
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: 16 }).map((_, index) => (
-                <span
-                  key={index}
-                  className="h-2 w-2 rounded-full bg-slate-400/60 animate-pulse"
-                  style={{ animationDelay: `${index * 65}ms` }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+        <p className="mt-1 text-sm leading-relaxed text-slate-500">{step}</p>
       </div>
     </div>
   </div>
@@ -204,6 +206,7 @@ const App: React.FC = () => {
   const [isTypingResponse, setIsTypingResponse] = useState(false);
   const [thinkingStep, setThinkingStep] = useState(0);
   const [activeThinkingSteps, setActiveThinkingSteps] = useState(THINKING_STEPS);
+  const [activeThinkingText, setActiveThinkingText] = useState('');
   const [error, setError] = useState<string | null>(null);
   
   // History State
@@ -269,6 +272,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isLoading) {
       setThinkingStep(0);
+      setActiveThinkingText('');
       return;
     }
 
@@ -325,6 +329,7 @@ const App: React.FC = () => {
     const shouldCreateDocx = wantsDocxFile(text);
     isSendingRef.current = true;
     setActiveThinkingSteps(getThinkingSteps(text, attachments));
+    setActiveThinkingText('');
     setMessages(updatedMessagesAfterUser);
     setIsLoading(true);
     setError(null);
@@ -361,7 +366,9 @@ const App: React.FC = () => {
     }
 
     try {
-      const aiResponse = await geminiService.sendMessage(text, attachments, messages);
+      const aiResponse = await geminiService.sendMessage(text, attachments, messages, {
+        onThinking: setActiveThinkingText,
+      });
       
       const newModelMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -614,7 +621,11 @@ const App: React.FC = () => {
                 isImageGenerationStepSet(activeThinkingSteps) ? (
                   <ImageGenerationLoader step={activeThinkingSteps[thinkingStep]} />
                 ) : (
-                  <ThinkingLoader step={activeThinkingSteps[thinkingStep]} steps={activeThinkingSteps} />
+                  <ThinkingLoader
+                    step={activeThinkingSteps[thinkingStep]}
+                    steps={activeThinkingSteps}
+                    liveThinking={activeThinkingText}
+                  />
                 )
               )}
               

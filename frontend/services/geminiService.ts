@@ -4,17 +4,22 @@ export interface PutraAiResponse {
   text: string;
   imageBase64?: string;
   mode?: string;
+  thinking?: string;
+}
+
+interface SendMessageCallbacks {
+  onThinking?: (thinking: string) => void;
 }
 
 const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
 const PRIMARY_OLLAMA_CHAT_URL =
   viteEnv.VITE_OLLAMA_CHAT_URL ||
-  'https://hostel-schema-forest-remains.trycloudflare.com/api/chat';
-const FALLBACK_TEXT_API_URL =
-  viteEnv.VITE_PUTRA_AI_V1_API_URL ||
-  'https://us-central1-conquer-apps-2ad61.cloudfunctions.net/prod/api.live';
-const OLLAMA_TEXT_MODEL = viteEnv.VITE_OLLAMA_TEXT_MODEL || 'qwen2.5:3b';
+  'https://rotunda-elderly-alto.ngrok-free.dev/api/chat';
+const FALLBACK_CHAT_PROXY_URL =
+  viteEnv.VITE_FALLBACK_CHAT_PROXY_URL ||
+  'https://api-mzmdqh3n6a-uc.a.run.app/api/chat';
+const OLLAMA_TEXT_MODEL = viteEnv.VITE_OLLAMA_TEXT_MODEL || 'putraai:v3';
 const OLLAMA_VISION_MODEL = viteEnv.VITE_OLLAMA_VISION_MODEL || 'llava:7b';
 
 function normalizeWhitespace(text: string) {
@@ -52,6 +57,52 @@ function extractFallbackText(data: any) {
     data?.answer ||
     '',
   );
+}
+
+function splitAiThinking(reply: string) {
+  const cleanReply = normalizeWhitespace(reply);
+  if (!cleanReply) return { text: '', thinking: '' };
+
+  const thinkTagMatch = cleanReply.match(/<think>([\s\S]*?)<\/think>\s*([\s\S]*)/i);
+  if (thinkTagMatch) {
+    return {
+      thinking: normalizeWhitespace(thinkTagMatch[1]),
+      text: normalizeWhitespace(thinkTagMatch[2]),
+    };
+  }
+
+  const answerMarker = cleanReply.match(/^(thinking\.{0,3}|pikiran\.{0,3}|proses\.{0,3})\s*([\s\S]*?)(?:\n\s*(?:jawaban|answer|final answer|final)\s*:\s*)([\s\S]*)$/i);
+  if (answerMarker) {
+    return {
+      thinking: normalizeWhitespace(answerMarker[2]),
+      text: normalizeWhitespace(answerMarker[3]),
+    };
+  }
+
+  if (/^thinking\.{0,3}/i.test(cleanReply)) {
+    const withoutMarker = normalizeWhitespace(cleanReply.replace(/^thinking\.{0,3}\s*/i, ''));
+    const paragraphs = withoutMarker.split(/\n\s*\n/).map(normalizeWhitespace).filter(Boolean);
+
+    if (paragraphs.length > 1) {
+      return {
+        thinking: paragraphs[0],
+        text: paragraphs.slice(1).join('\n\n'),
+      };
+    }
+
+    return {
+      thinking: withoutMarker,
+      text: 'Saya sedang menyusun jawaban. Jika jawaban utama belum muncul, coba kirim ulang pertanyaannya.',
+    };
+  }
+
+  return { text: cleanReply, thinking: '' };
+}
+
+function getThinkingPreview(text: string) {
+  const cleanText = normalizeWhitespace(text);
+  if (cleanText.length <= 4000) return cleanText;
+  return `${cleanText.slice(0, 4000).trim()}...`;
 }
 
 class PutraAiService {
@@ -102,21 +153,12 @@ class PutraAiService {
   }
 
   private toOllamaMessages(prompt: string, history: ReturnType<PutraAiService['toConversationHistory']>) {
-    const messages = history.slice(-8).map((message) => ({
+    const messages = history.slice(-10).map((message) => ({
       role: message.role === 'model' ? 'assistant' : 'user',
-      content: normalizeWhitespace(message.text).slice(0, 4000),
+      content: normalizeWhitespace(message.text).slice(0, 2500),
     }));
 
     return [
-      {
-        role: 'system',
-        content: [
-          'Kamu adalah Putra AI Plus.',
-          'Jawab dengan bahasa yang sama seperti pesan terbaru user.',
-          'Gunakan riwayat percakapan agar jawaban nyambung.',
-          'Jangan menyebut bahwa kamu asisten umum.',
-        ].join(' '),
-      },
       ...messages,
       {
         role: 'user',
@@ -125,36 +167,73 @@ class PutraAiService {
     ];
   }
 
-  private async readOllamaReply(response: Response) {
-    const rawBody = await response.text();
-    let fullText = '';
-
-    for (const line of rawBody.split('\n')) {
-      const cleanLine = line.trim();
-      if (!cleanLine) continue;
-
-      try {
-        const data = JSON.parse(cleanLine);
-        fullText += data?.message?.content || data?.response || '';
-      } catch {
-        fullText += cleanLine;
-      }
+  private parseOllamaLine(line: string) {
+    try {
+      return JSON.parse(line);
+    } catch {
+      return null;
     }
-
-    return normalizeWhitespace(fullText);
   }
 
-  private async sendToOllama(prompt: string, attachments: Attachment[], history: ReturnType<PutraAiService['toConversationHistory']>) {
+  private async readOllamaReply(response: Response, callbacks: SendMessageCallbacks = {}) {
+    let fullText = '';
+    let fullThinking = '';
+
+    const consumeLine = (line: string) => {
+      const cleanLine = line.trim();
+      if (!cleanLine) return;
+
+      const data = this.parseOllamaLine(cleanLine);
+      if (data) {
+        fullThinking += data?.message?.thinking || data?.thinking || '';
+        fullText += data?.message?.content || data?.response || '';
+        if (fullThinking && !fullText) callbacks.onThinking?.(getThinkingPreview(fullThinking));
+      } else {
+        fullText += cleanLine;
+      }
+    };
+
+    if (!response.body) {
+      const rawBody = await response.text();
+      for (const line of rawBody.split('\n')) consumeLine(line);
+      return {
+        text: normalizeWhitespace(fullText),
+        thinking: normalizeWhitespace(fullThinking),
+      };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let pending = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      pending += decoder.decode(value, { stream: true });
+      const lines = pending.split('\n');
+      pending = lines.pop() || '';
+      for (const line of lines) consumeLine(line);
+    }
+
+    pending += decoder.decode();
+    consumeLine(pending);
+
+    return {
+      text: normalizeWhitespace(fullText),
+      thinking: normalizeWhitespace(fullThinking),
+    };
+  }
+
+  private async sendToOllama(
+    prompt: string,
+    attachments: Attachment[],
+    history: ReturnType<PutraAiService['toConversationHistory']>,
+    callbacks: SendMessageCallbacks = {},
+  ) {
     const imageAttachment = attachments.find((attachment) => attachment.mimeType.startsWith('image/') && attachment.data);
     const isVision = Boolean(imageAttachment);
-    const content = isVision
-      ? [
-          normalizeWhitespace(prompt) || 'Analisis gambar ini secara detail.',
-          'Jawab sesuai bahasa pertanyaan user.',
-          'Jelaskan hanya berdasarkan gambar yang terlihat.',
-          'Jika ada teks di gambar, sebutkan teksnya.',
-        ].join('\n')
-      : normalizeWhitespace(prompt);
+    const content = normalizeWhitespace(prompt) || (isVision ? 'Analisis gambar ini.' : '');
 
     const response = await fetch(PRIMARY_OLLAMA_CHAT_URL, {
       method: 'POST',
@@ -165,6 +244,7 @@ class PutraAiService {
         model: isVision ? OLLAMA_VISION_MODEL : OLLAMA_TEXT_MODEL,
         messages: isVision
           ? [
+              ...this.toOllamaMessages('', history).filter((message) => message.content),
               {
                 role: 'user',
                 content,
@@ -173,10 +253,6 @@ class PutraAiService {
             ]
           : this.toOllamaMessages(content, history),
         stream: true,
-        options: {
-          temperature: isVision ? 0.2 : 0.3,
-          num_predict: isVision ? 420 : 512,
-        },
       }),
     });
 
@@ -184,43 +260,32 @@ class PutraAiService {
       throw new Error(`Cloudflare/Ollama gagal: ${response.status}`);
     }
 
-    const reply = await this.readOllamaReply(response);
-    if (!reply) {
+    const reply = await this.readOllamaReply(response, callbacks);
+    if (!reply.text) {
       throw new Error('Cloudflare/Ollama tidak mengirim balasan.');
     }
+    const parsedReply = splitAiThinking(reply.text);
 
     return {
-      text: reply,
+      text: parsedReply.text || reply.text,
+      thinking: reply.thinking || parsedReply.thinking,
       mode: isVision ? 'vision' : 'text',
     };
   }
 
   private async sendToFallbackApi(prompt: string, attachments: Attachment[], history: ReturnType<PutraAiService['toConversationHistory']>) {
     const hasImage = attachments.some((attachment) => attachment.mimeType.startsWith('image/'));
-    const conversationContext = history
-      .map((message) => `${message.role === 'model' ? 'PUTRA AI PLUS' : 'User'}: ${message.text}`)
-      .join('\n');
-    const finalPrompt = normalizeWhitespace(`
-Kamu adalah Putra AI Plus.
-Jawab dengan bahasa yang sama seperti pesan terbaru user.
-Gunakan riwayat percakapan agar jawaban tetap nyambung.
 
-${conversationContext ? `RIWAYAT:\n${conversationContext}\n` : ''}
-${hasImage ? 'Catatan: user mengirim gambar, tetapi layanan analisis gambar utama sedang tidak terhubung. Jawab berdasarkan pertanyaan user dan konteks yang tersedia, lalu minta user mengirim ulang jika detail gambar wajib dibaca.\n' : ''}
-PESAN TERBARU USER:
-${prompt || (hasImage ? 'Analisis gambar ini.' : '')}
-`);
-
-    const response = await fetch(FALLBACK_TEXT_API_URL, {
+    const response = await fetch(FALLBACK_CHAT_PROXY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        n: 1,
-        prompt: finalPrompt,
-        temperature: 0.8,
-        top_p: 0.9,
+        prompt: prompt || (hasImage ? 'Analisis gambar ini.' : ''),
+        model: 'PutraAi-V1',
+        attachments,
+        history,
       }),
     });
 
@@ -229,13 +294,14 @@ ${prompt || (hasImage ? 'Analisis gambar ini.' : '')}
       throw new Error(data?.message || data?.error || `Fallback API gagal: ${response.status}`);
     }
 
-    const reply = extractFallbackText(data);
+    const reply = normalizeWhitespace(data?.text || data?.content || extractFallbackText(data));
     if (!reply) {
       throw new Error('Fallback API tidak mengirim balasan.');
     }
 
     return {
       text: reply,
+      thinking: '',
       mode: hasImage ? 'vision' : 'text',
     };
   }
@@ -244,13 +310,15 @@ ${prompt || (hasImage ? 'Analisis gambar ini.' : '')}
     text: string,
     attachments: Attachment[] = [],
     history: Pick<Message, 'role' | 'text' | 'attachments' | 'mode'>[] = [],
+    callbacks: SendMessageCallbacks = {},
   ): Promise<PutraAiResponse> {
     const conversationHistory = this.toConversationHistory(history);
 
     try {
-      const primaryResponse = await this.sendToOllama(text.trim(), attachments, conversationHistory);
+      const primaryResponse = await this.sendToOllama(text.trim(), attachments, conversationHistory, callbacks);
       return {
         text: primaryResponse.text,
+        thinking: primaryResponse.thinking,
         imageBase64: '',
         mode: primaryResponse.mode,
       };
@@ -261,6 +329,7 @@ ${prompt || (hasImage ? 'Analisis gambar ini.' : '')}
         const fallbackResponse = await this.sendToFallbackApi(text.trim(), attachments, conversationHistory);
         return {
           text: fallbackResponse.text,
+          thinking: fallbackResponse.thinking,
           imageBase64: '',
           mode: fallbackResponse.mode,
         };

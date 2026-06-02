@@ -15,6 +15,7 @@ export interface Message {
   attachments?: Attachment[];
   imageBase64?: string;
   mode?: string;
+  thinking?: string;
   downloadDocx?: boolean;
   docxTitle?: string;
   animateTyping?: boolean;

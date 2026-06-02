@@ -655,7 +655,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
 
         return count + 1;
       });
-    }, 28);
+    }, 10);
 
     return () => window.clearInterval(timer);
   }, [message.id, shouldAnimate, words.length]);
