@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Attachment, Message } from '../types';
 import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -638,6 +638,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
   const renderedText = shouldAnimate ? words.slice(0, typedWordCount).join('') : message.text;
   const renderedMarkdown = useMemo(() => linkifyBareUrls(renderedText), [renderedText]);
   const isAnimationComplete = !shouldAnimate || typedWordCount >= words.length;
+  const canShowModelActions = isAnimationComplete && !message.isStreaming;
 
   useEffect(() => {
     typingCompleteRef.current = false;
@@ -656,9 +657,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
           return count;
         }
 
-        return Math.min(count + 3, words.length);
+        return Math.min(count + 6, words.length);
       });
-    }, 14);
+    }, 8);
 
     return () => window.clearInterval(timer);
   }, [message.id, shouldAnimate, words.length]);
@@ -732,7 +733,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
     <div className="flex w-full mb-8 justify-start">
       <div className="flex max-w-full md:max-w-[90%] flex-row items-start gap-4">
         {/* Assistant icon */}
-        <div className="flex-shrink-0 mt-1">
+        <div className="flex-shrink-0 pt-[2px]">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
             <img
               src={APP_ICON_URL}
@@ -743,7 +744,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
         </div>
 
         {/* Message Content */}
-        <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden pt-[5px]">
           <div className="markdown-body text-[15px] text-slate-800 dark:text-slate-100">
             <ReactMarkdown
               components={{
@@ -778,7 +779,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
               />
             </div>
           )}
-          {isAnimationComplete && (
+          {canShowModelActions && (
             <div className="mt-3 flex flex-wrap justify-start gap-2">
               <CopyButton
                 text={message.text}
@@ -829,3 +830,4 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
     </div>
   );
 };
+

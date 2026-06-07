@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Send, Plus, Image as ImageIcon, Mic, X, FileText, File, Square } from 'lucide-react';
 import { Attachment } from '../types';
 
@@ -78,6 +78,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     };
   }, []);
 
+  const MAX_IMAGE_SIZE_BYTES = 3 * 1024 * 1024;
+  const IMAGE_MAX_DIMENSION = 1024;
+  const IMAGE_JPEG_QUALITY = 0.8;
+  const SUPPORTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+
   const readFileAsDataUrl = (file: File | Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -89,50 +94,72 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     });
   };
 
-  const dataUrlToBase64 = (dataUrl: string) => dataUrl.split(',')[1] || '';
+  const dataUrlToBase64 = (dataUrl: string) => dataUrl.replace(/^data:image\/\w+;base64,/, '').split(',').pop() || '';
+  const getBase64ByteSize = (base64: string) => {
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+  };
 
-  const compressImageToBase64 = async (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {
-    const dataUrl = await readFileAsDataUrl(file);
-
+  const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(dataUrlToBase64(dataUrl));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(dataUrlToBase64(canvas.toDataURL('image/jpeg', quality)));
-      };
-      img.onerror = reject;
-      img.src = dataUrl;
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('Gambar gagal dibaca. Coba gunakan gambar PNG, JPG, JPEG, atau WEBP.'));
+      image.src = dataUrl;
     });
   };
 
-  const fileToBase64 = async (file: File): Promise<{ data: string; mimeType: string }> => {
+  const imageToBase64 = async (file: File): Promise<{ data: string; mimeType: string; size: number }> => {
+    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+      throw new Error('Format gambar harus PNG, JPG, JPEG, atau WEBP.');
+    }
+
+    const originalDataUrl = await readFileAsDataUrl(file);
+    const image = await loadImageFromDataUrl(originalDataUrl);
+    const scale = Math.min(1, IMAGE_MAX_DIMENSION / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Browser gagal memproses gambar. Coba gunakan browser terbaru.');
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+
+    let quality = IMAGE_JPEG_QUALITY;
+    let base64 = dataUrlToBase64(canvas.toDataURL('image/jpeg', quality));
+    let size = getBase64ByteSize(base64);
+
+    while (size > MAX_IMAGE_SIZE_BYTES && quality > 0.45) {
+      quality = Math.max(0.45, quality - 0.1);
+      base64 = dataUrlToBase64(canvas.toDataURL('image/jpeg', quality));
+      size = getBase64ByteSize(base64);
+    }
+
+    if (size > MAX_IMAGE_SIZE_BYTES) {
+      throw new Error('Maksimal 3MB. Gambar sudah dikompres, tapi masih terlalu besar. Coba pilih gambar yang lebih kecil.');
+    }
+
+    return {
+      data: base64,
+      mimeType: 'image/jpeg',
+      size,
+    };
+  };
+
+  const fileToBase64 = async (file: File): Promise<{ data: string; mimeType: string; size: number }> => {
     if (file.type.startsWith('image/')) {
-      return {
-        data: await compressImageToBase64(file),
-        mimeType: 'image/jpeg',
-      };
+      return imageToBase64(file);
     }
 
     return {
       data: dataUrlToBase64(await readFileAsDataUrl(file)),
       mimeType: file.type || 'application/octet-stream',
+      size: file.size,
     };
   };
 
@@ -149,10 +176,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           id: Date.now().toString() + i,
           name: file.name,
           mimeType: fileData.mimeType,
-          data: fileData.data
+          data: fileData.data,
+          size: fileData.size
         });
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Gagal membaca file.";
         console.error("Gagal membaca file:", error);
+        alert(message);
       }
     }
 
@@ -413,3 +443,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     </div>
   );
 };
+
+
+

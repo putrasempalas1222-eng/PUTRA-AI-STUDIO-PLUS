@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, FileText, KeyRound, MessageSquare, Mic2, Package, Plus, Repeat2, X } from 'lucide-react';
 import { ChatSession } from '../types';
 
@@ -100,12 +100,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenPackages}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                   activeView === 'packages'
-                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                    ? 'bg-blue-100 text-slate-900 ring-1 ring-blue-200 dark:bg-blue-500/20 dark:text-blue-100 dark:ring-blue-400/20'
                     : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
-                <Package size={16} className="flex-shrink-0 opacity-75" />
-                <span className="text-sm font-medium truncate">Paket</span>
+                <Package size={16} className={`flex-shrink-0 ${activeView === 'packages' ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-75'}`} />
+                <span className={`truncate text-sm font-medium ${activeView === 'packages' ? 'text-slate-900 dark:text-blue-100' : ''}`}>Paket</span>
               </button>
             </div>
           </div>
@@ -118,24 +118,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenVoice}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                   activeView === 'voice'
-                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                    ? 'bg-blue-100 text-slate-900 ring-1 ring-blue-200 dark:bg-blue-500/20 dark:text-blue-100 dark:ring-blue-400/20'
                     : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
-                <Mic2 size={16} className="flex-shrink-0 opacity-75" />
-                <span className="text-sm font-medium truncate">Putra Voice</span>
+                <Mic2 size={16} className={`flex-shrink-0 ${activeView === 'voice' ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-75'}`} />
+                <span className={`truncate text-sm font-medium ${activeView === 'voice' ? 'text-slate-900 dark:text-blue-100' : ''}`}>Putra Voice</span>
               </button>
               <button
                 type="button"
                 onClick={onOpenPpt}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                   activeView === 'ppt'
-                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                    ? 'bg-blue-100 text-slate-900 ring-1 ring-blue-200 dark:bg-blue-500/20 dark:text-blue-100 dark:ring-blue-400/20'
                     : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
-                <FileText size={16} className="flex-shrink-0 opacity-75" />
-                <span className="text-sm font-medium truncate">Putra PPT</span>
+                <FileText size={16} className={`flex-shrink-0 ${activeView === 'ppt' ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-75'}`} />
+                <span className={`truncate text-sm font-medium ${activeView === 'ppt' ? 'text-slate-900 dark:text-blue-100' : ''}`}>Putra PPT</span>
               </button>
               <div>
                 <button
@@ -143,12 +143,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => setIsConvertOpen((value) => !value)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                     isConvertActive
-                      ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                      ? 'bg-blue-100 text-slate-900 ring-1 ring-blue-200 dark:bg-blue-500/20 dark:text-blue-100 dark:ring-blue-400/20'
                       : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <Repeat2 size={16} className="flex-shrink-0 opacity-75" />
-                  <span className="text-sm font-medium truncate">Putra Convers</span>
+                  <Repeat2 size={16} className={`flex-shrink-0 ${isConvertActive ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-75'}`} />
+                  <span className={`truncate text-sm font-medium ${isConvertActive ? 'text-slate-900 dark:text-blue-100' : ''}`}>Putra Convers</span>
                   {isConvertOpen ? (
                     <ChevronUp size={15} className="ml-auto opacity-70" />
                   ) : (
@@ -205,8 +205,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       : 'hover:bg-slate-200/70 text-slate-700'
                   }`}
                 >
-                  <MessageSquare size={16} className="flex-shrink-0 opacity-70" />
-                  <span className="text-sm truncate">{session.title}</span>
+                  <MessageSquare size={16} className={`flex-shrink-0 ${currentSessionId === session.id ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-70'}`} />
+                  <span className={`truncate text-sm ${currentSessionId === session.id ? 'font-medium text-slate-900 dark:text-blue-100' : ''}`}>{session.title}</span>
                 </button>
               ))}
 
@@ -236,3 +236,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
+
+

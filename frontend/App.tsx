@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Message, ChatSession, Attachment } from './types';
 import { geminiService } from './services/AiServices';
 import { auth, ensureUserDocument, getUserChatHistory, saveChatSession } from './services/firebase';
@@ -11,7 +11,7 @@ import { PutraPpt } from './components/PutraPpt';
 import { PutraPackages } from './components/PutraPackages';
 import { PutraConvert } from './components/PutraConvert';
 import { AuthModal, AuthMode } from './components/AuthModal';
-import { ChevronDown, Menu, Moon, Sparkles, Sun, LogOut, User as UserIcon } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Menu, Moon, Sparkles, Sun, LogOut, User as UserIcon } from 'lucide-react';
 
 const THINKING_STEPS = [
   'Memahami permintaan',
@@ -122,6 +122,74 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
 
 const isImageGenerationStepSet = (steps: string[]) => steps === IMAGE_GENERATION_STEPS;
 
+type DisplayError = {
+  title: string;
+  code: string;
+  detail: string;
+};
+
+function formatDisplayError(error: string): DisplayError {
+  const rawError = String(error || '').trim();
+  const codeMatch = rawError.match(/^([A-Z0-9_ -]{3,40})\s*:\s*([\s\S]*)$/);
+  const code = codeMatch ? codeMatch[1].trim().replace(/\s+/g, '_') : 'APP_ERROR';
+  const body = codeMatch ? codeMatch[2].trim() : rawError;
+  const detailMatch = body.match(/^([\s\S]*?)\s*Detail\s*:\s*([\s\S]*)$/i);
+  const message = (detailMatch ? detailMatch[1] : body).trim();
+  const detail = (detailMatch ? detailMatch[2] : body).trim();
+  const normalized = `${code} ${rawError}`.toLowerCase();
+
+  if (
+    normalized.includes('fetch') ||
+    normalized.includes('server sedang ada perbaikan') ||
+    normalized.includes('network') ||
+    normalized.includes('econnrefused') ||
+    normalized.includes('model_not_ready')
+  ) {
+    return {
+      title: 'Server sedang ada perbaikan',
+      code: code === 'APP_ERROR' ? 'SERVER_MAINTENANCE' : code,
+      detail: detail || message || 'Koneksi ke server AI belum stabil.',
+    };
+  }
+
+  return {
+    title: message || 'Terjadi kesalahan',
+    code,
+    detail: detail || rawError || 'Silakan coba lagi.',
+  };
+}
+
+const ErrorNotice: React.FC<{ error: string; compact?: boolean; isDark?: boolean }> = ({ error, compact = false, isDark = false }) => {
+  const displayError = formatDisplayError(error);
+
+  return (
+    <div className={`mx-auto ${compact ? 'mt-4 max-w-xl' : 'mb-8 max-w-3xl'} rounded-2xl border p-4 text-left shadow-sm ${
+      isDark
+        ? 'border-amber-400/20 bg-amber-400/10 text-amber-50'
+        : 'border-amber-200 bg-amber-50 text-amber-950'
+    }`}>
+      <div className="flex items-start gap-3">
+        <div className={`mt-0.5 rounded-full p-2 ${isDark ? 'bg-amber-300/15 text-amber-200' : 'bg-amber-100 text-amber-700'}`}>
+          <AlertTriangle size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold">{displayError.title}</p>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide ${
+              isDark ? 'bg-slate-950/40 text-amber-100' : 'bg-white text-amber-800 ring-1 ring-amber-200'
+            }`}>
+              {displayError.code}
+            </span>
+          </div>
+          <p className={`mt-1 break-words text-xs leading-relaxed ${isDark ? 'text-amber-100/80' : 'text-amber-900/75'}`}>
+            {displayError.detail}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: string; fallbackLines?: string[] }> = ({ step, steps, liveThinking, fallbackLines = FALLBACK_THINKING_LINES }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [typedText, setTypedText] = useState('');
@@ -130,7 +198,7 @@ const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: s
     ? 'Menganalisis gambar'
     : steps === FILE_ANALYSIS_STEPS
       ? 'Menganalisis file'
-      : 'Memikirkan jawaban';
+      : 'Thinking...';
 
   const hasLiveThinking = Boolean(liveThinking?.trim());
   const detailText = hasLiveThinking ? liveThinking!.trim() : fallbackLines[fallbackIndex];
@@ -187,12 +255,10 @@ const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: s
           <button
             type="button"
             onClick={() => setIsOpen((open) => !open)}
-            className="flex items-center gap-2 text-left text-slate-700 transition-colors hover:text-slate-950 dark:text-slate-200 dark:hover:text-white"
+            className="flex items-center gap-2 text-left text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
+
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
             <ChevronDown
               size={15}
               className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -262,11 +328,8 @@ const App: React.FC = () => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem('putra-theme') === 'dark' ? 'dark' : 'light';
   });
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const subscriptionBadge = 'BASIC';
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatScrollRef = useRef<HTMLElement>(null);
-  const shouldAutoScrollRef = useRef(true);
   const isSendingRef = useRef(false);
 
   useEffect(() => {
@@ -286,18 +349,32 @@ const App: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    const setAppHeight = () => {
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+    const setViewportVars = () => {
+      const layoutHeight = window.innerHeight;
+      const visualViewport = window.visualViewport;
+      const keyboardInset = visualViewport
+        ? Math.max(0, layoutHeight - visualViewport.height - visualViewport.offsetTop)
+        : 0;
+
+      document.documentElement.style.setProperty('--app-height', `${layoutHeight}px`);
+      document.documentElement.style.setProperty('--keyboard-inset', `${keyboardInset}px`);
+      document.body.classList.toggle('keyboard-open', keyboardInset > 80);
+      setIsKeyboardOpen(keyboardInset > 80);
     };
 
-    setAppHeight();
-    window.addEventListener('resize', setAppHeight);
-    window.visualViewport?.addEventListener('resize', setAppHeight);
+    setViewportVars();
+    window.addEventListener('resize', setViewportVars);
+    window.addEventListener('orientationchange', setViewportVars);
+    window.visualViewport?.addEventListener('resize', setViewportVars);
+    window.visualViewport?.addEventListener('scroll', setViewportVars);
 
     return () => {
-      window.removeEventListener('resize', setAppHeight);
-      window.visualViewport?.removeEventListener('resize', setAppHeight);
+      window.removeEventListener('resize', setViewportVars);
+      window.removeEventListener('orientationchange', setViewportVars);
+      window.visualViewport?.removeEventListener('resize', setViewportVars);
+      window.visualViewport?.removeEventListener('scroll', setViewportVars);
+      document.body.classList.remove('keyboard-open');
+      document.documentElement.style.removeProperty('--keyboard-inset');
     };
   }, []);
 
@@ -324,23 +401,6 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const updateAutoScrollState = useCallback(() => {
-    const container = chatScrollRef.current;
-    if (!container) {
-      shouldAutoScrollRef.current = true;
-      return;
-    }
-
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldAutoScrollRef.current = distanceFromBottom < 140;
-  }, []);
-
-  // Scroll to bottom only while the user is already near the bottom.
-  useEffect(() => {
-    if (messages.length > 0 && shouldAutoScrollRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: isTypingResponse ? 'auto' : 'smooth' });
-    }
-  }, [messages, isLoading, isTypingResponse]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -401,7 +461,6 @@ const App: React.FC = () => {
     const updatedMessagesAfterUser = [...messages, newUserMessage];
     const shouldCreateDocx = wantsDocxFile(text);
     isSendingRef.current = true;
-    shouldAutoScrollRef.current = true;
     setActiveThinkingSteps(getThinkingSteps(text, attachments));
     setActiveThinkingFallbackLines(getFallbackThinkingLines(text));
     setActiveThinkingText('');
@@ -467,6 +526,7 @@ const App: React.FC = () => {
               downloadDocx: shouldCreateDocx,
               docxTitle: shouldCreateDocx ? getDocxTitle(text) : undefined,
               animateTyping: false,
+              isStreaming: true,
             };
 
             if (currentMessages.some((message) => message.id === streamingMessageId)) {
@@ -490,6 +550,7 @@ const App: React.FC = () => {
         downloadDocx: shouldCreateDocx,
         docxTitle: shouldCreateDocx ? getDocxTitle(text) : undefined,
         animateTyping: !hasStreamingContent,
+        isStreaming: false,
       };
       
       const finalMessages = [...updatedMessagesAfterUser, newModelMessage];
@@ -590,7 +651,7 @@ const App: React.FC = () => {
   const isDarkTheme = theme === 'dark';
 
   return (
-    <div className={`putra-theme-root flex h-[var(--app-height,100dvh)] w-full overflow-hidden font-sans transition-colors ${
+    <div className={`putra-theme-root flex h-[var(--app-height,100dvh)] w-full overflow-hidden font-sans transition-colors ${isKeyboardOpen ? 'putra-keyboard-open' : ''} ${
       theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-white text-slate-800'
     }`}>
       
@@ -704,7 +765,7 @@ const App: React.FC = () => {
         ) : activeView === 'ppt' ? (
           <PutraPpt />
         ) : (
-        <main ref={chatScrollRef} onScroll={updateAutoScrollState} className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain transition-colors ${
+        <main className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain transition-colors ${
           isDarkTheme ? 'bg-slate-950' : 'bg-white'
         } ${isEmptyChat ? '' : 'pb-64 md:pb-56'}`}>
           {isEmptyChat ? (
@@ -724,7 +785,7 @@ const App: React.FC = () => {
                   background: 'radial-gradient(ellipse at center, rgba(37, 99, 235, 0.34) 0%, rgba(124, 58, 237, 0.22) 24%, rgba(15, 23, 42, 0.96) 52%, #020617 100%)',
                 }}
               />
-              <div className="relative z-10 flex w-full max-w-[660px] -translate-y-10 flex-col items-center gap-8 sm:-translate-y-6">
+              <div className={`relative z-10 flex w-full max-w-[660px] flex-col items-center gap-8 transition-transform sm:-translate-y-6 ${isKeyboardOpen ? '-translate-y-24' : '-translate-y-10'}`}>
                 <div className="flex flex-col items-center gap-4 text-center">
                   <div className={`inline-flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
                     isDarkTheme ? 'bg-slate-900 ring-slate-700' : 'bg-blue-50 ring-blue-100'
@@ -754,11 +815,7 @@ const App: React.FC = () => {
                     placeholder="Minta PUTRA AI"
                     theme={theme}
                   />
-                  {error && (
-                    <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-sm text-red-600 dark:text-red-100">
-                      {error}
-                    </div>
-                  )}
+                  {error && <ErrorNotice error={error} compact isDark={isDarkTheme} />}
                 </div>
               </div>
             </div>
@@ -782,13 +839,9 @@ const App: React.FC = () => {
                 )
               )}
               
-              {error && (
-                <div className="mb-8 rounded-2xl border border-red-100 bg-red-50 p-4 text-center text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-                  {error}
-                </div>
-              )}
+              {error && <ErrorNotice error={error} isDark={isDarkTheme} />}
               
-              <div ref={messagesEndRef} className="h-36 md:h-32" />
+              <div className="h-36 md:h-32" />
             </div>
           )}
         </main>
@@ -797,7 +850,8 @@ const App: React.FC = () => {
         {/* Input Area Fixed at Bottom */}
         {activeView === 'chat' && !isEmptyChat && (
         <div
-          className={`absolute bottom-0 left-0 w-full bg-gradient-to-t px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 transition-colors md:px-6 ${
+          style={{ bottom: 'var(--keyboard-inset, 0px)' }}
+          className={`absolute left-0 w-full bg-gradient-to-t px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 transition-[background-color,opacity,bottom] md:px-6 ${
             isDarkTheme
               ? 'from-slate-950 via-slate-950 to-transparent'
               : 'from-white via-white to-transparent'
@@ -807,7 +861,7 @@ const App: React.FC = () => {
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isTypingResponse || !user} theme={theme} />
             <div className="text-center mt-3">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                © 2026 PUTRA AI STUDIO.{' '}
+                Â© 2026 PUTRA AI STUDIO.{' '}
                 <a
                   href="https://www.putraaistudioapikey.site/#privacy"
                   className="font-medium text-slate-600 underline underline-offset-2 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
@@ -835,3 +889,6 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+
+

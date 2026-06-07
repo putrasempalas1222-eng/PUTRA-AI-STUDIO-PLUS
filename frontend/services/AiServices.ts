@@ -1,4 +1,4 @@
-import { Attachment, Message } from '../types';
+﻿import { Attachment, Message } from '../types';
 
 export interface PutraAiResponse {
   text: string;
@@ -16,12 +16,14 @@ const viteEnv = (import.meta as unknown as { env?: Record<string, string | undef
 
 const PRIMARY_OLLAMA_CHAT_URL =
   viteEnv.VITE_OLLAMA_CHAT_URL ||
-  'https://rotunda-elderly-alto.ngrok-free.dev/api/chat';
+  'http://localhost:11434/api/chat';
 const FALLBACK_CHAT_PROXY_URL =
   viteEnv.VITE_FALLBACK_CHAT_PROXY_URL ||
   'https://api-mzmdqh3n6a-uc.a.run.app/api/chat';
 const OLLAMA_TEXT_MODEL = viteEnv.VITE_OLLAMA_TEXT_MODEL || 'deepseek-r1:8b';
-const OLLAMA_VISION_MODEL = viteEnv.VITE_OLLAMA_VISION_MODEL || 'llava:7b';
+const OLLAMA_VISION_MODEL = viteEnv.VITE_OLLAMA_VISION_MODEL || 'qwen2.5vl:7b';
+const MAX_OLLAMA_IMAGE_BYTES = 3 * 1024 * 1024;
+const SUPPORTED_OLLAMA_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
 function normalizeWhitespace(text: string) {
   return String(text || '')
@@ -30,8 +32,29 @@ function normalizeWhitespace(text: string) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+function isLikelyIndonesianText(text: string) {
+  const normalized = ` ${String(text || '').toLowerCase()} `;
+  return /\b(saya|anda|kamu|yang|dan|atau|dengan|untuk|dari|ini|itu|dapat|bisa|membantu|pertanyaan|jawaban|bahasa|teks|gambar|file)\b/.test(normalized);
+}
+
+function stripDuplicateEnglishTail(text: string) {
+  const cleanText = normalizeWhitespace(text);
+  if (!isLikelyIndonesianText(cleanText)) return cleanText;
+
+  const englishTailPatterns = [
+    /\n\s*What can I do\s*\??[\s\S]*$/i,
+    /\n\s*As Putra AI Studio[\s\S]*$/i,
+    /\n\s*As PUTRA AI PLUS[\s\S]*$/i,
+    /\n\s*Here are some things I can do[\s\S]*$/i,
+    /\n\s*How can I help(?: you)?\s*\??[\s\S]*$/i,
+    /\n\s*What would you like(?: me)? to do\s*\??[\s\S]*$/i,
+    /\n\s*I can help you[\s\S]*$/i,
+  ];
+
+  return englishTailPatterns.reduce((result, pattern) => result.replace(pattern, ''), cleanText).trim();
+}
 function sanitizeModelIdentity(text: string) {
-  return normalizeWhitespace(text)
+  return stripDuplicateEnglishTail(normalizeWhitespace(text))
     .replace(/\bDeepSeek(?:\s*AI)?\b/gi, 'Putra AI Studio')
     .replace(/\bdeepseek-r1(?::\d+b)?\b/gi, 'Putra AI Studio')
     .replace(/\bQwen(?:\s*AI)?\b/gi, 'Putra AI Studio')
@@ -42,6 +65,42 @@ function sanitizeModelIdentity(text: string) {
     .replace(/\bClaude\b/gi, 'Putra AI Studio')
     .replace(/\bMistral\b/gi, 'Putra AI Studio')
     .replace(/\bOllama\b/gi, 'Putra AI Studio');
+}
+function toRawBase64(data?: string) {
+  return String(data || '').replace(/^data:image\/\w+;base64,/, '').replace(/^data:[^,]+,/, '');
+}
+
+function getBase64ByteSize(base64: string) {
+  const cleanBase64 = toRawBase64(base64);
+  const padding = cleanBase64.endsWith('==') ? 2 : cleanBase64.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((cleanBase64.length * 3) / 4) - padding);
+}
+
+function validateOllamaImageAttachment(attachment?: Attachment) {
+  if (!attachment?.data) {
+    throw new Error('Gambar belum terbaca. Coba upload ulang gambar.');
+  }
+
+  if (!SUPPORTED_OLLAMA_IMAGE_TYPES.has(attachment.mimeType)) {
+    throw new Error('Format gambar harus PNG, JPG, JPEG, atau WEBP.');
+  }
+
+  const rawBase64 = toRawBase64(attachment.data);
+  if (!rawBase64) {
+    throw new Error('Data gambar kosong. Coba upload ulang gambar.');
+  }
+
+  const imageSize = attachment.size || getBase64ByteSize(rawBase64);
+  if (imageSize > MAX_OLLAMA_IMAGE_BYTES) {
+    throw new Error('Ukuran gambar maksimal 3MB. Kompres gambar dulu lalu coba lagi.');
+  }
+
+  return rawBase64;
+}
+
+function isVisionInputError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+  return message.includes('format gambar') || message.includes('ukuran gambar') || message.includes('data gambar') || message.includes('gambar belum terbaca');
 }
 
 function getUserFacingError(error: unknown) {
@@ -55,6 +114,27 @@ function getUserFacingError(error: unknown) {
     normalizedMessage.includes('workers paid plan')
   ) {
     return 'PUTRA AI PLUS sedang maintenance. Silakan coba lagi beberapa saat nanti.';
+  }
+
+  if (
+    normalizedMessage.includes('failed to fetch') ||
+    normalizedMessage.includes('fetch failed') ||
+    normalizedMessage.includes('econnrefused') ||
+    normalizedMessage.includes('networkerror') ||
+    normalizedMessage.includes('load failed')
+  ) {
+    return `FETCH_ERROR: Server sedang ada perbaikan. Detail: ${message || 'Koneksi ke server AI gagal.'}`;
+  }
+
+  if (
+    normalizedMessage.includes('model') &&
+    (normalizedMessage.includes('not found') || normalizedMessage.includes('pull') || normalizedMessage.includes('404'))
+  ) {
+    return `MODEL_NOT_READY: Server sedang ada perbaikan. Detail: ${message || 'Model AI belum tersedia di server.'}`;
+  }
+
+  if (normalizedMessage.includes('too large') || normalizedMessage.includes('payload') || normalizedMessage.includes('ukuran gambar')) {
+    return `IMAGE_TOO_LARGE: Ukuran gambar terlalu besar. Detail: Maksimal 3MB untuk analisis gambar.`;
   }
 
   return message || 'Gagal mendapatkan balasan dari PUTRA AI PLUS. Silakan coba lagi nanti.';
@@ -114,7 +194,7 @@ function splitAiThinking(reply: string) {
 }
 
 function getThinkingPreview(text: string) {
-  return normalizeWhitespace(text);
+  return stripDuplicateEnglishTail(normalizeWhitespace(text));
 }
 function hasCjkText(text: string) {
   return /[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(text);
@@ -136,7 +216,8 @@ function getOllamaSystemPrompt(prompt: string) {
   return [
     'You are Putra AI Studio, also known as PUTRA AI PLUS.',
     `Use ${thinkingLanguage} for reasoning/thinking text.`,
-    'Use the same language as the latest user message for the final answer whenever it is clear.',
+    'Use exactly one final-answer language: the same language as the latest user message whenever it is clear.',
+    'Do not repeat the same answer in another language. Do not append an English version after an Indonesian answer.',
     'Never mention DeepSeek, Qwen, Llama, Gemini, OpenAI, ChatGPT, Claude, Mistral, Ollama, or any underlying model/provider name.',
     'If asked about your model, say you are Putra AI Studio.',
     'Default to English for very short or unclear prompts.',
@@ -146,6 +227,16 @@ function getOllamaSystemPrompt(prompt: string) {
   ].join(' ');
 }
 
+
+function getFastTextSystemPrompt(prompt: string) {
+  const finalLanguage = isLikelyIndonesianPrompt(prompt) ? 'Indonesian' : 'the same language as the user';
+  return [
+    'You are Putra AI Studio / PUTRA AI PLUS.',
+    `Answer in ${finalLanguage}.`,
+    'Keep the response direct, useful, and do not repeat it in another language.',
+    'Never mention the underlying model/provider name; if asked, say Putra AI Studio.'
+  ].join(' ');
+}
 
 class PutraAiService {
   public initChat() {
@@ -194,16 +285,17 @@ class PutraAiService {
       }));
   }
 
-  private toOllamaMessages(prompt: string, history: ReturnType<PutraAiService['toConversationHistory']>) {
-    const messages = history.slice(-10).map((message) => ({
+  private toOllamaMessages(prompt: string, history: ReturnType<PutraAiService['toConversationHistory']>, mode: 'text' | 'vision' = 'vision') {
+    const isTextMode = mode === 'text';
+    const messages = history.slice(isTextMode ? -4 : -10).map((message) => ({
       role: message.role === 'model' ? 'assistant' : 'user',
-      content: normalizeWhitespace(message.text).slice(0, 2500),
+      content: normalizeWhitespace(message.text).slice(0, isTextMode ? 900 : 2500),
     }));
 
     return [
       {
         role: 'system',
-        content: getOllamaSystemPrompt(prompt),
+        content: isTextMode ? getFastTextSystemPrompt(prompt) : getOllamaSystemPrompt(prompt),
       },
       ...messages,
       {
@@ -276,15 +368,16 @@ class PutraAiService {
     };
   }
 
-  private async sendToOllama(
+  private async askVision(
     prompt: string,
-    attachments: Attachment[],
+    imageAttachment: Attachment,
     history: ReturnType<PutraAiService['toConversationHistory']>,
     callbacks: SendMessageCallbacks = {},
   ) {
-    const imageAttachment = attachments.find((attachment) => attachment.mimeType.startsWith('image/') && attachment.data);
-    const isVision = Boolean(imageAttachment);
-    const content = normalizeWhitespace(prompt) || (isVision ? 'Analisis gambar ini.' : '');
+    const content = normalizeWhitespace(prompt) || 'Jelaskan gambar ini secara detail';
+    const imageBase64 = validateOllamaImageAttachment(imageAttachment);
+
+    callbacks.onThinking?.('Menganalisis gambar dengan Putra AI Studio...');
 
     const response = await fetch(PRIMARY_OLLAMA_CHAT_URL, {
       method: 'POST',
@@ -292,17 +385,58 @@ class PutraAiService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: isVision ? OLLAMA_VISION_MODEL : OLLAMA_TEXT_MODEL,
-        messages: isVision
-          ? [
-              ...this.toOllamaMessages(content, history).slice(0, -1),
-              {
-                role: 'user',
-                content,
-                images: [imageAttachment?.data],
-              },
-            ]
-          : this.toOllamaMessages(content, history),
+        model: OLLAMA_VISION_MODEL,
+        messages: [
+          ...this.toOllamaMessages(content, history).slice(0, -1),
+          {
+            role: 'user',
+            content,
+            images: [imageBase64],
+          },
+        ],
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`Ollama vision gagal: ${response.status} ${errorText}`.trim());
+    }
+
+    const reply = await this.readOllamaReply(response, callbacks, content);
+    if (!reply.text) {
+      throw new Error('Ollama vision tidak mengirim balasan. Pastikan model vision sudah tersedia di server.');
+    }
+
+    const parsedReply = splitAiThinking(sanitizeModelIdentity(reply.text));
+    return {
+      text: sanitizeModelIdentity(parsedReply.text || reply.text),
+      thinking: reply.thinking || parsedReply.thinking,
+      mode: 'vision',
+    };
+  }
+  private async sendToOllama(
+    prompt: string,
+    attachments: Attachment[],
+    history: ReturnType<PutraAiService['toConversationHistory']>,
+    callbacks: SendMessageCallbacks = {},
+  ) {
+    const imageAttachment = attachments.find((attachment) => attachment.mimeType.startsWith('image/') && attachment.data);
+    if (imageAttachment) {
+      return this.askVision(prompt, imageAttachment, history, callbacks);
+    }
+
+    const content = normalizeWhitespace(prompt);
+
+    const response = await fetch(PRIMARY_OLLAMA_CHAT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_TEXT_MODEL,
+        messages: this.toOllamaMessages(content, history, 'text'),
+
         stream: true,
       }),
     });
@@ -320,7 +454,7 @@ class PutraAiService {
     return {
       text: sanitizeModelIdentity(parsedReply.text || reply.text),
       thinking: reply.thinking || parsedReply.thinking,
-      mode: isVision ? 'vision' : 'text',
+      mode: 'text',
     };
   }
 
@@ -366,7 +500,10 @@ class PutraAiService {
     const conversationHistory = this.toConversationHistory(history);
 
     try {
-      const primaryResponse = await this.sendToOllama(text.trim(), attachments, conversationHistory, callbacks);
+      const hasDocumentAttachment = attachments.some((attachment) => !attachment.mimeType.startsWith('image/'));
+      const primaryResponse = hasDocumentAttachment
+        ? await this.sendToFallbackApi(text.trim(), attachments, conversationHistory)
+        : await this.sendToOllama(text.trim(), attachments, conversationHistory, callbacks);
       return {
         text: primaryResponse.text,
         thinking: primaryResponse.thinking,
@@ -375,6 +512,9 @@ class PutraAiService {
       };
     } catch (primaryError) {
       console.warn('Cloudflare/Ollama gagal, fallback ke PutraAi-V1:', primaryError);
+      if (attachments.some((attachment) => attachment.mimeType.startsWith('image/')) || isVisionInputError(primaryError)) {
+        throw new Error(getUserFacingError(primaryError));
+      }
 
       try {
         const fallbackResponse = await this.sendToFallbackApi(text.trim(), attachments, conversationHistory);
@@ -397,3 +537,13 @@ class PutraAiService {
 }
 
 export const geminiService = new PutraAiService();
+
+
+
+
+
+
+
+
+
+

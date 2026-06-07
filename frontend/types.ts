@@ -1,10 +1,11 @@
-export type Role = 'user' | 'model';
+﻿export type Role = 'user' | 'model';
 
 export interface Attachment {
   id: string;
   name: string;
   mimeType: string;
   data?: string; // Base64 encoded data (without the data:URI prefix)
+  size?: number;
 }
 
 export interface Message {
@@ -19,6 +20,7 @@ export interface Message {
   downloadDocx?: boolean;
   docxTitle?: string;
   animateTyping?: boolean;
+  isStreaming?: boolean;
 }
 
 export interface SuggestedPrompt {
@@ -34,3 +36,6 @@ export interface ChatSession {
   updatedAt: string;
   messages: Message[];
 }
+
+
+

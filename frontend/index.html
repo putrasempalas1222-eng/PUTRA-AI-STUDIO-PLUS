@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 
 <head>
@@ -63,13 +63,26 @@
     #root {
       width: 100%;
       height: 100%;
+      min-height: 100%;
       overflow: hidden;
       overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
     }
 
     body {
+      position: fixed;
+      inset: 0;
       font-family: 'Inter', sans-serif;
       margin: 0;
+    }
+
+    #root {
+      position: fixed;
+      inset: 0;
+    }
+
+    body.keyboard-open {
+      touch-action: none;
     }
 
     /* Custom scrollbar for a cleaner look */
@@ -254,6 +267,95 @@
       color: #1e293b !important;
     }
 
+    html[data-theme="dark"],
+    html[data-theme="dark"] body,
+    html[data-theme="dark"] #root {
+      background: #020617 !important;
+      color: #e2e8f0 !important;
+      color-scheme: dark !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root,
+    html[data-theme="dark"] .putra-theme-root main {
+      background-color: #020617 !important;
+      color: #e2e8f0 !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root section,
+    html[data-theme="dark"] .putra-theme-root article,
+    html[data-theme="dark"] .putra-theme-root .bg-white,
+    html[data-theme="dark"] .putra-theme-root .bg-white\/80,
+    html[data-theme="dark"] .putra-theme-root .bg-white\/75,
+    html[data-theme="dark"] .putra-theme-root .bg-white\/70,
+    html[data-theme="dark"] .putra-theme-root .bg-white\/50,
+    html[data-theme="dark"] .putra-theme-root .bg-slate-50,
+    html[data-theme="dark"] .putra-theme-root .bg-slate-50\/40,
+    html[data-theme="dark"] .putra-theme-root .bg-blue-50,
+    html[data-theme="dark"] .putra-theme-root .bg-blue-50\/40,
+    html[data-theme="dark"] .putra-theme-root .bg-emerald-50\/50,
+    html[data-theme="dark"] .putra-theme-root .bg-violet-50\/50 {
+      background-color: #0f172a !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root .bg-slate-100,
+    html[data-theme="dark"] .putra-theme-root .hover\:bg-slate-50:hover,
+    html[data-theme="dark"] .putra-theme-root .hover\:bg-blue-50:hover {
+      background-color: #1e293b !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root .text-slate-950,
+    html[data-theme="dark"] .putra-theme-root .text-slate-900,
+    html[data-theme="dark"] .putra-theme-root .text-slate-800,
+    html[data-theme="dark"] .putra-theme-root .text-slate-700,
+    html[data-theme="dark"] .putra-theme-root .text-slate-600 {
+      color: #e2e8f0 !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root .text-slate-500,
+    html[data-theme="dark"] .putra-theme-root .text-slate-400 {
+      color: #94a3b8 !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root .border-slate-100,
+    html[data-theme="dark"] .putra-theme-root .border-slate-200,
+    html[data-theme="dark"] .putra-theme-root .border-slate-300,
+    html[data-theme="dark"] .putra-theme-root .border-blue-100,
+    html[data-theme="dark"] .putra-theme-root .border-blue-200,
+    html[data-theme="dark"] .putra-theme-root .border-emerald-200,
+    html[data-theme="dark"] .putra-theme-root .border-violet-200,
+    html[data-theme="dark"] .putra-theme-root .border-white\/70,
+    html[data-theme="dark"] .putra-theme-root .border-white\/75,
+    html[data-theme="dark"] .putra-theme-root .border-white\/80 {
+      border-color: #334155 !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root input,
+    html[data-theme="dark"] .putra-theme-root textarea,
+    html[data-theme="dark"] .putra-theme-root select {
+      background-color: #111827 !important;
+      border-color: #334155 !important;
+      color: #e2e8f0 !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root input::placeholder,
+    html[data-theme="dark"] .putra-theme-root textarea::placeholder {
+      color: #64748b !important;
+    }
+
+
+    html[data-theme="dark"] .putra-theme-root .bg-gradient-to-br {
+      background-image: linear-gradient(to bottom right, #0f172a, #111827) !important;
+    }
+
+    html[data-theme="dark"] .putra-theme-root [style*="radial-gradient"] {
+      background: radial-gradient(circle at 50% 28%, rgba(37, 99, 235, 0.18), rgba(15, 23, 42, 0.92) 38%, #020617 74%) !important;
+    }
+    html[data-theme="dark"] .putra-theme-root .shadow-sm,
+    html[data-theme="dark"] .putra-theme-root .shadow-lg,
+    html[data-theme="dark"] .putra-theme-root .shadow-xl,
+    html[data-theme="dark"] .putra-theme-root .shadow-2xl {
+      --tw-shadow-color: rgb(0 0 0 / 0.35) !important;
+    }
     html[data-theme="light"] .putra-theme-root .border-slate-800,
     html[data-theme="light"] .putra-theme-root .border-slate-700 {
       border-color: #e2e8f0 !important;
@@ -279,3 +381,6 @@
 </body>
 
 </html>
+
+
+
