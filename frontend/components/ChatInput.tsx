@@ -78,7 +78,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     };
   }, []);
 
-  const MAX_IMAGE_SIZE_BYTES = 3 * 1024 * 1024;
+  const MAX_IMAGE_SIZE_BYTES = 1 * 1024 * 1024;
   const IMAGE_MAX_DIMENSION = 1024;
   const IMAGE_JPEG_QUALITY = 0.8;
   const SUPPORTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
@@ -141,7 +141,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     if (size > MAX_IMAGE_SIZE_BYTES) {
-      throw new Error('Maksimal 3MB. Gambar sudah dikompres, tapi masih terlalu besar. Coba pilih gambar yang lebih kecil.');
+      throw new Error('Maksimal 1MB. Gambar sudah dikompres, tapi masih terlalu besar. Coba pilih gambar yang lebih kecil.');
     }
 
     return {
@@ -295,9 +295,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <div className={`relative flex flex-col rounded-[28px] shadow-lg transition-all md:rounded-[32px] ${
       isDarkTheme
-        ? 'bg-slate-900 shadow-black/20 ring-1 ring-slate-700 focus-within:bg-slate-900 focus-within:ring-blue-500/40'
+        ? isHero
+          ? 'bg-slate-900/95 shadow-2xl shadow-black/25 ring-1 ring-slate-700/80 focus-within:bg-slate-900 focus-within:ring-blue-500/50'
+          : 'bg-slate-900 shadow-black/20 ring-1 ring-slate-700 focus-within:bg-slate-900 focus-within:ring-blue-500/40'
         : isHero
-          ? 'bg-white shadow-slate-900/10 ring-1 ring-slate-200/80 focus-within:bg-white focus-within:ring-blue-200'
+          ? 'bg-white/95 shadow-2xl shadow-slate-900/12 ring-1 ring-slate-200/90 backdrop-blur focus-within:bg-white focus-within:shadow-[0_20px_60px_rgba(15,23,42,0.16)] focus-within:ring-blue-200'
           : 'bg-[#f0f4f9] shadow-slate-900/5 focus-within:bg-white focus-within:shadow-[0_8px_24px_rgba(15,23,42,0.08)] focus-within:ring-1 focus-within:ring-gray-200'
     }`}>
       
@@ -371,7 +373,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       )}
 
       {/* Input Area */}
-      <form onSubmit={handleSubmit} className="flex items-end gap-1.5 md:gap-2 px-2 py-2">
+      <form onSubmit={handleSubmit} className={`flex items-end gap-1.5 md:gap-2 px-2 ${isHero ? 'py-3' : 'py-2'}`}>
         {/* Left Action Buttons */}
         <div className="flex items-center gap-0.5 md:gap-1 pb-1 pl-1 md:pl-2">
           <button 
@@ -405,7 +407,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={isRecording ? "Sedang merekam..." : placeholder}
-          className={`max-h-[200px] min-w-0 flex-1 resize-none border-none bg-transparent px-1.5 py-3 text-[15px] outline-none focus:ring-0 disabled:opacity-50 md:px-2 ${
+          className={`max-h-[200px] min-w-0 flex-1 resize-none border-none bg-transparent px-1.5 outline-none focus:ring-0 disabled:opacity-50 md:px-2 ${isHero ? 'py-3.5 text-[16px]' : 'py-3 text-[15px]'} ${
             isDarkTheme ? 'text-slate-100 placeholder-slate-500' : 'text-slate-800 placeholder-slate-500'
           }`}
           rows={1}

@@ -20,8 +20,8 @@ const PRIMARY_OLLAMA_CHAT_URL =
 const FALLBACK_CHAT_PROXY_URL =
   viteEnv.VITE_FALLBACK_CHAT_PROXY_URL ||
   'https://api-mzmdqh3n6a-uc.a.run.app/api/chat';
-const OLLAMA_TEXT_MODEL = viteEnv.VITE_OLLAMA_TEXT_MODEL || 'deepseek-r1:8b';
-const OLLAMA_VISION_MODEL = viteEnv.VITE_OLLAMA_VISION_MODEL || '';
+const OLLAMA_TEXT_MODEL = (viteEnv.VITE_OLLAMA_TEXT_MODEL || 'deepseek-r1:8b').trim() || 'deepseek-r1:8b';
+const OLLAMA_VISION_MODEL = (viteEnv.VITE_OLLAMA_VISION_MODEL || 'gemma3:4b').trim() || 'gemma3:4b';
 const MAX_OLLAMA_IMAGE_BYTES = 3 * 1024 * 1024;
 const SUPPORTED_OLLAMA_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 

@@ -59,6 +59,7 @@ const BARE_URL_PATTERN = /https?:\/\/[^\s<>\])]+/g;
 
 const toDataUrl = (attachment: Attachment) => {
   if (!attachment.data) return '';
+  if (/^https?:\/\//i.test(attachment.data)) return attachment.data;
   if (attachment.data.startsWith('data:')) return attachment.data;
   return `data:${attachment.mimeType || 'application/octet-stream'};base64,${attachment.data}`;
 };
@@ -559,8 +560,8 @@ const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachm
 
     if (isImage) {
       return (
-        <div className="flex min-h-[260px] items-center justify-center rounded-xl bg-slate-50 p-3">
-          <img src={dataUrl} alt={attachment.name} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+        <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-slate-50 p-2 dark:bg-slate-900">
+          <img src={dataUrl} alt={attachment.name} className="max-h-[62dvh] max-w-full rounded-lg object-contain md:max-h-[70vh]" />
         </div>
       );
     }
@@ -599,9 +600,15 @@ const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachm
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-slate-950/40 p-3 backdrop-blur-sm md:p-6">
-      <div className="relative flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-5"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[88dvh] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-950"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex min-w-0 items-center gap-2">
             <FileText size={18} className="shrink-0 text-blue-600" />
             <div className="min-w-0">
@@ -612,14 +619,14 @@ const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachm
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             title="Tutup preview"
             aria-label="Tutup preview"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-4">
           {renderPreview()}
         </div>
       </div>
@@ -771,13 +778,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
             </ReactMarkdown>
           </div>
           {message.imageBase64 && isAnimationComplete && (
-            <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setAttachmentPreview({
+                id: `image-${message.id}`,
+                name: 'Hasil gambar PUTRA AI PLUS',
+                mimeType: 'image/jpeg',
+                data: message.imageBase64 || '',
+              })}
+              className="mt-4 block max-w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700"
+              title="Lihat gambar"
+            >
               <img
                 src={message.imageBase64}
                 alt="Hasil gambar"
-                className="max-w-full rounded-xl border border-slate-200 shadow-sm"
+                className="max-w-full object-contain"
               />
-            </div>
+            </button>
           )}
           {canShowModelActions && (
             <div className="mt-3 flex flex-wrap justify-start gap-2">
@@ -800,6 +817,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
           )}
         </div>
       </div>
+      {attachmentPreview && (
+        <AttachmentPreviewModal
+          attachment={attachmentPreview}
+          onClose={() => setAttachmentPreview(null)}
+        />
+      )}
       {codePreview && (
         <div className="fixed inset-0 z-50 flex bg-slate-950/70 p-3 backdrop-blur-sm md:p-6">
           <div className="relative flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">

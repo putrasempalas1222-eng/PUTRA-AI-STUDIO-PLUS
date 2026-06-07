@@ -11,7 +11,7 @@ import { PutraPpt } from './components/PutraPpt';
 import { PutraPackages } from './components/PutraPackages';
 import { PutraConvert } from './components/PutraConvert';
 import { AuthModal, AuthMode } from './components/AuthModal';
-import { AlertTriangle, ChevronDown, Menu, Moon, Sparkles, Sun, LogOut, User as UserIcon } from 'lucide-react';
+import { AlertTriangle, Menu, Moon, Sparkles, Sun, LogOut, User as UserIcon } from 'lucide-react';
 
 const THINKING_STEPS = [
   'Memahami permintaan',
@@ -255,14 +255,11 @@ const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: s
           <button
             type="button"
             onClick={() => setIsOpen((open) => !open)}
-            className="flex items-center gap-2 text-left text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            className="inline-flex text-left text-sm font-medium text-slate-500 transition-colors hover:text-blue-600 focus:outline-none focus-visible:underline dark:text-slate-400 dark:hover:text-blue-300"
+            title={isOpen ? 'Sembunyikan isi pikiran AI' : 'Tampilkan isi pikiran AI'}
+            aria-expanded={isOpen}
           >
-
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-            <ChevronDown
-              size={15}
-              className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
-            />
+            {title}
           </button>
           {isOpen && (
             <p className="mt-1 min-h-5 max-w-3xl text-[13px] font-normal leading-6 text-slate-500/85 dark:text-slate-400/85">
@@ -331,6 +328,13 @@ const App: React.FC = () => {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const subscriptionBadge = 'BASIC';
   const isSendingRef = useRef(false);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToNewestUserMessage = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+  }, []);
 
   useEffect(() => {
     const isDark = theme === 'dark';
@@ -459,12 +463,14 @@ const App: React.FC = () => {
     };
 
     const updatedMessagesAfterUser = [...messages, newUserMessage];
+    const isVisionRequest = attachments.some((attachment) => attachment.mimeType.startsWith('image/'));
     const shouldCreateDocx = wantsDocxFile(text);
     isSendingRef.current = true;
     setActiveThinkingSteps(getThinkingSteps(text, attachments));
     setActiveThinkingFallbackLines(getFallbackThinkingLines(text));
     setActiveThinkingText('');
     setMessages(updatedMessagesAfterUser);
+    scrollToNewestUserMessage();
     setIsLoading(true);
     setError(null);
 
@@ -507,6 +513,8 @@ const App: React.FC = () => {
       const aiResponse = await geminiService.sendMessage(text, attachments, messages, {
         onThinking: setActiveThinkingText,
         onContent: (content) => {
+          if (isVisionRequest) return;
+
           const cleanContent = content.trim();
           if (!cleanContent) return;
 
@@ -522,7 +530,7 @@ const App: React.FC = () => {
               text: cleanContent,
               timestamp: new Date(),
               imageBase64: '',
-              mode: attachments.some((attachment) => attachment.mimeType.startsWith('image/')) ? 'vision' : 'text',
+              mode: isVisionRequest ? 'vision' : 'text',
               downloadDocx: shouldCreateDocx,
               docxTitle: shouldCreateDocx ? getDocxTitle(text) : undefined,
               animateTyping: false,
@@ -582,7 +590,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, currentSessionId, user, chatHistory, updateLocalHistory, isLoading, isTypingResponse]);
+  }, [messages, currentSessionId, user, chatHistory, updateLocalHistory, isLoading, isTypingResponse, scrollToNewestUserMessage]);
 
   const handleTypingComplete = useCallback((messageId: string) => {
     setMessages((currentMessages) =>
@@ -785,34 +793,47 @@ const App: React.FC = () => {
                   background: 'radial-gradient(ellipse at center, rgba(37, 99, 235, 0.34) 0%, rgba(124, 58, 237, 0.22) 24%, rgba(15, 23, 42, 0.96) 52%, #020617 100%)',
                 }}
               />
-              <div className={`relative z-10 flex w-full max-w-[660px] flex-col items-center gap-8 transition-transform sm:-translate-y-6 ${isKeyboardOpen ? '-translate-y-24' : '-translate-y-10'}`}>
+              <div className={`relative z-10 flex w-full max-w-[760px] flex-col items-center gap-7 transition-transform sm:-translate-y-5 ${isKeyboardOpen ? '-translate-y-24' : '-translate-y-8'}`}>
                 <div className="flex flex-col items-center gap-4 text-center">
-                  <div className={`inline-flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
-                    isDarkTheme ? 'bg-slate-900 ring-slate-700' : 'bg-blue-50 ring-blue-100'
-                  }`}>
-                    <img
-                      src={APP_ICON_URL}
-                      alt="PUTRA AI STUDIO"
-                      className="h-9 w-9 object-contain"
-                    />
+                  <div className="relative">
+                    <div className={`absolute inset-[-18px] rounded-full blur-2xl ${
+                      isDarkTheme ? 'bg-blue-500/20' : 'bg-blue-400/20'
+                    }`} />
+                    <div className={`relative inline-flex h-16 w-16 items-center justify-center rounded-full shadow-sm ring-1 ${
+                      isDarkTheme ? 'bg-slate-900/95 ring-slate-700' : 'bg-white/90 ring-blue-100'
+                    }`}>
+                      <img
+                        src={APP_ICON_URL}
+                        alt="PUTRA AI STUDIO"
+                        className="h-10 w-10 object-contain"
+                      />
+                    </div>
                   </div>
-                  <h2 className={`text-[28px] font-medium leading-tight tracking-normal sm:text-4xl ${
-                    isDarkTheme ? 'text-slate-100' : 'text-slate-700'
-                  }`}>
-                    Sebaiknya kita mulai dari mana?
-                  </h2>
-                  {username && (
-                    <p className="max-w-[80vw] truncate bg-gradient-to-r from-blue-600 via-violet-500 to-rose-500 bg-clip-text text-xl font-semibold leading-tight text-transparent sm:text-2xl">
-                      {username}
-                    </p>
-                  )}
+                  <div className="space-y-3">
+                    <h2 className={`text-balance text-[30px] font-semibold leading-tight tracking-normal sm:text-5xl ${
+                      isDarkTheme ? 'text-slate-50' : 'text-slate-800'
+                    }`}>
+                      Mau mulai dari apa hari ini?
+                    </h2>
+                    {username && (
+                      <div className="flex justify-center">
+                        <span className={`max-w-[80vw] truncate rounded-full px-4 py-1.5 text-sm font-semibold shadow-sm ring-1 sm:text-base ${
+                          isDarkTheme
+                            ? 'bg-slate-900/80 text-blue-200 ring-slate-700'
+                            : 'bg-white/80 text-blue-700 ring-blue-100'
+                        }`}>
+                          {username}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="w-full">
+                <div className="w-full max-w-[720px]">
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading || isTypingResponse || !user}
                     variant="hero"
-                    placeholder="Minta PUTRA AI"
+                    placeholder="Tulis pesan untuk PUTRA AI"
                     theme={theme}
                   />
                   {error && <ErrorNotice error={error} compact isDark={isDarkTheme} />}
@@ -841,7 +862,7 @@ const App: React.FC = () => {
               
               {error && <ErrorNotice error={error} isDark={isDarkTheme} />}
               
-              <div className="h-36 md:h-32" />
+              <div ref={chatBottomRef} className="h-36 md:h-32" />
             </div>
           )}
         </main>
@@ -861,7 +882,7 @@ const App: React.FC = () => {
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isTypingResponse || !user} theme={theme} />
             <div className="text-center mt-3">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Â© 2026 PUTRA AI STUDIO.{' '}
+                &copy; 2026 PUTRA AI STUDIO.{' '}
                 <a
                   href="https://www.putraaistudioapikey.site/#privacy"
                   className="font-medium text-slate-600 underline underline-offset-2 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
