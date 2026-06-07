@@ -1,4 +1,28 @@
 ﻿export type Role = 'user' | 'model';
+export type UserStatusRole = 'basic' | 'pro' | 'plus';
+
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  phoneNumber: string | null;
+  photoURL: string | null;
+  status_role: UserStatusRole;
+  roleExpiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+export interface AccountDevice {
+  id: string;
+  name: string;
+  userAgent: string;
+  createdAt: string;
+  lastActive: string;
+  active: boolean;
+  isCurrent?: boolean;
+}
 
 export interface Attachment {
   id: string;

@@ -10,18 +10,18 @@ export interface PutraAiResponse {
 interface SendMessageCallbacks {
   onThinking?: (thinking: string) => void;
   onContent?: (content: string) => void;
+  authToken?: string;
+  userId?: string;
+  sessionId?: string;
 }
 
 const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-const PRIMARY_OLLAMA_CHAT_URL =
-  viteEnv.VITE_OLLAMA_CHAT_URL ||
-  'https://rotunda-elderly-alto.ngrok-free.dev/api/chat';
-const FALLBACK_CHAT_PROXY_URL =
-  viteEnv.VITE_FALLBACK_CHAT_PROXY_URL ||
-  'https://api-mzmdqh3n6a-uc.a.run.app/api/chat';
-const OLLAMA_TEXT_MODEL = (viteEnv.VITE_OLLAMA_TEXT_MODEL || 'deepseek-r1:8b').trim() || 'deepseek-r1:8b';
-const OLLAMA_VISION_MODEL = (viteEnv.VITE_OLLAMA_VISION_MODEL || 'gemma3:4b').trim() || 'gemma3:4b';
+const SERVER_CHAT_PROXY_URL = viteEnv.VITE_CHAT_PROXY_URL || '/api/chat';
+const FALLBACK_CHAT_PROXY_URL = SERVER_CHAT_PROXY_URL;
+const PRIMARY_OLLAMA_CHAT_URL = '';
+const OLLAMA_TEXT_MODEL = '';
+const OLLAMA_VISION_MODEL = '';
 const MAX_OLLAMA_IMAGE_BYTES = 3 * 1024 * 1024;
 const SUPPORTED_OLLAMA_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
@@ -458,19 +458,24 @@ class PutraAiService {
     };
   }
 
-  private async sendToFallbackApi(prompt: string, attachments: Attachment[], history: ReturnType<PutraAiService['toConversationHistory']>) {
+  private async sendToFallbackApi(prompt: string, attachments: Attachment[], history: ReturnType<PutraAiService['toConversationHistory']>, requestOptions: SendMessageCallbacks = {}) {
     const hasImage = attachments.some((attachment) => attachment.mimeType.startsWith('image/'));
+
+    requestOptions.onThinking?.('Menghubungkan ke server PUTRA AI PLUS...');
 
     const response = await fetch(FALLBACK_CHAT_PROXY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(requestOptions.authToken ? { Authorization: `Bearer ${requestOptions.authToken}` } : {}),
       },
       body: JSON.stringify({
         prompt: prompt || (hasImage ? 'Analisis gambar ini.' : ''),
         model: 'PutraAi-V1',
         attachments,
         history,
+        userId: requestOptions.userId,
+        sessionId: requestOptions.sessionId,
       }),
     });
 
@@ -500,34 +505,16 @@ class PutraAiService {
     const conversationHistory = this.toConversationHistory(history);
 
     try {
-      const hasDocumentAttachment = attachments.some((attachment) => !attachment.mimeType.startsWith('image/'));
-      const primaryResponse = hasDocumentAttachment
-        ? await this.sendToFallbackApi(text.trim(), attachments, conversationHistory)
-        : await this.sendToOllama(text.trim(), attachments, conversationHistory, callbacks);
+      const serverResponse = await this.sendToFallbackApi(text.trim(), attachments, conversationHistory, callbacks);
       return {
-        text: primaryResponse.text,
-        thinking: primaryResponse.thinking,
+        text: serverResponse.text,
+        thinking: serverResponse.thinking,
         imageBase64: '',
-        mode: primaryResponse.mode,
+        mode: serverResponse.mode,
       };
-    } catch (primaryError) {
-      console.warn('Cloudflare/Ollama gagal, fallback ke PutraAi-V1:', primaryError);
-      if (attachments.some((attachment) => attachment.mimeType.startsWith('image/')) || isVisionInputError(primaryError)) {
-        throw new Error(getUserFacingError(primaryError));
-      }
-
-      try {
-        const fallbackResponse = await this.sendToFallbackApi(text.trim(), attachments, conversationHistory);
-        return {
-          text: fallbackResponse.text,
-          thinking: fallbackResponse.thinking,
-          imageBase64: '',
-          mode: fallbackResponse.mode,
-        };
-      } catch (fallbackError) {
-        console.error('Gagal berkomunikasi dengan Putra API:', fallbackError);
-        throw new Error(getUserFacingError(fallbackError));
-      }
+    } catch (error) {
+      console.error('Gagal berkomunikasi dengan server Putra API:', error);
+      throw new Error(getUserFacingError(error));
     }
   }
 

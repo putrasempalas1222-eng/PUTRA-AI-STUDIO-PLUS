@@ -11,11 +11,11 @@ export interface PptData {
   slides: PptSlide[];
 }
 
-const DEFAULT_API_BASE_URL = 'https://api-mzmdqh3n6a-uc.a.run.app';
+const DEFAULT_API_BASE_URL = '';
 
 function getPptApiUrl() {
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
-  return `${apiBaseUrl}/api/ppt`;
+  return apiBaseUrl ? `${apiBaseUrl}/api/ppt` : '/api/ppt';
 }
 
 export async function generatePptContent(topic: string, slideCount: number, language: string): Promise<PptData> {

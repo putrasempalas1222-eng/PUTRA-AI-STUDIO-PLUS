@@ -1,8 +1,8 @@
 ﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Message, ChatSession, Attachment } from './types';
+import { Message, ChatSession, Attachment, UserStatusRole, AccountDevice, UserProfile } from './types';
 import { geminiService } from './services/AiServices';
-import { auth, ensureUserDocument, getUserChatHistory, saveChatSession } from './services/firebase';
-import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+import { auth, ensureUserDocument, getUserChatHistory, getUserDevices, logoutUserDevice, registerUserDevice, saveChatSession, updateUserDeviceHeartbeat, updateUserDisplayName } from './services/firebase';
+import { EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, reauthenticateWithPopup, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { Sidebar, AppView } from './components/Sidebar';
@@ -11,7 +11,7 @@ import { PutraPpt } from './components/PutraPpt';
 import { PutraPackages } from './components/PutraPackages';
 import { PutraConvert } from './components/PutraConvert';
 import { AuthModal, AuthMode } from './components/AuthModal';
-import { AlertTriangle, Menu, Moon, Sparkles, Sun, LogOut, User as UserIcon } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Edit3, Lock, LogOut, Menu, MonitorSmartphone, Moon, RefreshCw, Save, ShieldCheck, Sparkles, Sun, Trash2, User as UserIcon, X } from 'lucide-react';
 
 const THINKING_STEPS = [
   'Memahami permintaan',
@@ -60,6 +60,75 @@ function getFallbackThinkingLines(prompt: string) {
 }
 
 const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09';
+
+const DEVICE_ID_STORAGE_KEY = 'putra-ai-plus-device-id';
+const ACTIVE_VIEW_STORAGE_KEY = 'putra-ai-plus-active-view';
+const RESTORABLE_VIEWS: AppView[] = ['chat', 'voice', 'ppt', 'packages', 'account', 'convert-word-pdf', 'convert-ppt-pdf'];
+
+const getStoredActiveView = (): AppView => {
+  if (typeof window === 'undefined') return 'chat';
+  const storedView = window.localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY) as AppView | null;
+  return storedView && RESTORABLE_VIEWS.includes(storedView) ? storedView : 'chat';
+};
+
+const getClientDeviceId = () => {
+  if (typeof window === 'undefined') return 'server-device';
+  const existingId = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+  if (existingId) return existingId;
+
+  const nextId = typeof window.crypto?.randomUUID === 'function'
+    ? window.crypto.randomUUID()
+    : `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, nextId);
+  return nextId;
+};
+
+const getClientDeviceName = () => {
+  if (typeof navigator === 'undefined') return 'Perangkat ini';
+  const userAgent = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+
+  if (/iPhone/i.test(userAgent)) return 'iPhone';
+  if (/iPad/i.test(userAgent)) return 'iPad';
+  if (/Android/i.test(userAgent)) return 'Android';
+  if (/Windows/i.test(userAgent)) return 'Windows PC';
+  if (/Macintosh|Mac OS/i.test(userAgent)) return 'Mac';
+  if (/Linux/i.test(userAgent)) return 'Linux';
+  return platform || 'Perangkat ini';
+};
+
+const getClientUserAgent = () => (typeof navigator === 'undefined' ? '' : navigator.userAgent || '');
+
+const formatDeviceDate = (value: string) => {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Tidak diketahui';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const formatRoleExpiryDate = (value?: string | null) => {
+  if (!value) return 'Tidak ada masa berlaku';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Tanggal tidak valid';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const isRoleExpired = (value?: string | null) => {
+  if (!value) return false;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.getTime() <= Date.now();
+};
 
 const IMAGE_GENERATION_KEYWORDS = [
   'buat gambar',
@@ -121,6 +190,7 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
 };
 
 const isImageGenerationStepSet = (steps: string[]) => steps === IMAGE_GENERATION_STEPS;
+
 
 type DisplayError = {
   title: string;
@@ -189,6 +259,379 @@ const ErrorNotice: React.FC<{ error: string; compact?: boolean; isDark?: boolean
     </div>
   );
 };
+
+
+const AccountDeviceModal: React.FC<{
+  user: FirebaseUser;
+  userRole: UserStatusRole;
+  devices: AccountDevice[];
+  currentDeviceId: string;
+  isDark: boolean;
+  isBlocked: boolean;
+  error: string;
+  isRefreshing: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+  onLogoutDevice: (device: AccountDevice) => void;
+}> = ({ user, userRole, devices, currentDeviceId, isDark, isBlocked, error, isRefreshing, onClose, onRefresh, onLogoutDevice }) => {
+  const activeDevices = devices.filter((device) => device.active);
+  const username = user.displayName || user.email?.split('@')[0] || 'Pengguna';
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-4 py-5 backdrop-blur-sm">
+      <section className={`flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border shadow-2xl ${
+        isDark ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+      }`}>
+        <div className={`flex items-center justify-between gap-4 border-b px-5 py-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-500">PUTRA AI PLUS</p>
+            <h2 className="text-xl font-semibold">Informasi akun</h2>
+          </div>
+          {!isBlocked && (
+            <button
+              type="button"
+              onClick={onClose}
+              className={`rounded-full p-2 transition-colors ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+              aria-label="Tutup informasi akun"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
+
+        <div className="min-h-0 overflow-y-auto px-5 py-5">
+          {isBlocked && (
+            <div className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-amber-400/20 bg-amber-400/10 text-amber-100' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+              Akun ini sudah aktif di 3 device. Logout salah satu device lama dulu untuk melanjutkan di perangkat ini.
+            </div>
+          )}
+
+          {error && (
+            <div className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-red-400/20 bg-red-400/10 text-red-100' : 'border-red-200 bg-red-50 text-red-700'}`}>
+              {error}
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className={`rounded-2xl border p-4 sm:col-span-2 ${isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Username</p>
+              <p className="mt-1 truncate text-lg font-semibold">{username}</p>
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Email</p>
+              <p className="mt-1 break-all text-sm">{user.email || 'Belum ada email'}</p>
+            </div>
+            <div className={`rounded-2xl border p-4 ${isDark ? 'border-blue-400/20 bg-blue-400/10' : 'border-blue-100 bg-blue-50'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Role</p>
+              <p className="mt-2 text-2xl font-bold uppercase text-blue-600">{userRole}</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Device aktif: {activeDevices.length}/3</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold">Device aktif</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Device tidak aktif 7 hari otomatis keluar.</p>
+            </div>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${isDark ? 'bg-slate-900 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {devices.length === 0 ? (
+              <div className={`rounded-2xl border px-4 py-5 text-center text-sm ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+                Belum ada device yang tercatat.
+              </div>
+            ) : devices.map((device) => {
+              const isCurrent = device.id === currentDeviceId || device.isCurrent;
+              return (
+                <div key={device.id} className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+                  isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-white'
+                } ${!device.active ? 'opacity-55' : ''}`}>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className={`rounded-2xl p-2 ${isDark ? 'bg-slate-800 text-blue-300' : 'bg-blue-50 text-blue-600'}`}>
+                      <MonitorSmartphone size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{device.name}</p>
+                        {isCurrent && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">Device ini</span>}
+                        {!device.active && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">Keluar</span>}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Aktif terakhir: {formatDeviceDate(device.lastActive)}</p>
+                      <p className="mt-1 line-clamp-1 text-xs text-slate-400">{device.userAgent || device.id}</p>
+                    </div>
+                  </div>
+
+                  {device.active && !isCurrent && (
+                    <button
+                      type="button"
+                      onClick={() => onLogoutDevice(device)}
+                      className={`inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors ${isDark ? 'bg-red-400/10 text-red-200 hover:bg-red-400/20' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                    >
+                      <Trash2 size={15} />
+                      Logout device
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+
+const AccountPage: React.FC<{
+  user: FirebaseUser;
+  userRole: UserStatusRole;
+  roleExpiresAt?: string | null;
+  devices: AccountDevice[];
+  currentDeviceId: string;
+  isDark: boolean;
+  isBlocked: boolean;
+  error: string;
+  usernameDraft: string;
+  isSavingUsername: boolean;
+  isRefreshing: boolean;
+  onUsernameChange: (value: string) => void;
+  onSaveUsername: () => void;
+  onRefresh: () => void;
+  onLogoutDevice: (device: AccountDevice) => void;
+}> = ({ user, userRole, roleExpiresAt, devices, currentDeviceId, isDark, isBlocked, error, usernameDraft, isSavingUsername, isRefreshing, onUsernameChange, onSaveUsername, onRefresh, onLogoutDevice }) => {
+  const activeDevices = devices.filter((device) => device.active);
+  const isPaid = userRole === 'pro' || userRole === 'plus';
+  const expiryText = isPaid
+    ? roleExpiresAt
+      ? formatRoleExpiryDate(roleExpiresAt)
+      : 'Belum ada tanggal kadaluarsa'
+    : 'Basic aktif selamanya';
+  const username = usernameDraft.trim() || user.displayName || user.email?.split('@')[0] || 'Pengguna';
+  const planTone = userRole === 'plus'
+    ? isDark ? 'from-violet-400 to-fuchsia-300' : 'from-violet-600 to-fuchsia-500'
+    : userRole === 'pro'
+      ? isDark ? 'from-emerald-300 to-blue-300' : 'from-emerald-500 to-blue-600'
+      : isDark ? 'from-blue-300 to-sky-200' : 'from-blue-600 to-sky-500';
+
+  return (
+    <main className={`min-h-0 flex-1 overflow-y-auto transition-colors ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-[#f7f9fc] text-slate-950'}`}>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-6 lg:px-8">
+        <section className={`relative overflow-hidden rounded-[28px] border p-5 shadow-sm md:p-7 ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
+          <div className={`pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-r ${planTone} opacity-15`} />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
+              <div className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-[26px] bg-gradient-to-br ${planTone} text-3xl font-bold text-white shadow-lg shadow-blue-600/20`}>
+                {username.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${isDark ? 'bg-white/10 text-blue-100 ring-1 ring-white/10' : 'bg-blue-50 text-blue-700 ring-1 ring-blue-100'}`}>
+                    PUTRA AI PLUS
+                  </span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${isDark ? 'bg-slate-950 text-slate-200 ring-1 ring-slate-700' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>
+                    {activeDevices.length}/3 device aktif
+                  </span>
+                </div>
+                <h1 className="truncate text-3xl font-semibold tracking-normal md:text-5xl">{username}</h1>
+                <p className={`mt-2 max-w-2xl text-sm leading-6 md:text-base ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Kelola profil, masa berlaku paket, dan perangkat yang masih tersambung ke akun ini.
+                </p>
+              </div>
+            </div>
+
+            <div className={`rounded-[24px] border p-4 shadow-sm ${isDark ? 'border-slate-700 bg-slate-950/70' : 'border-slate-200 bg-slate-50/90'}`}>
+              <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Paket aktif</p>
+              <div className="mt-2 flex items-end gap-3">
+                <span className={`bg-gradient-to-r ${planTone} bg-clip-text text-4xl font-black uppercase tracking-tight text-transparent`}>
+                  {userRole}
+                </span>
+                <ShieldCheck className={isPaid ? 'mb-1 text-emerald-500' : 'mb-1 text-blue-500'} size={22} />
+              </div>
+              <p className={`mt-2 max-w-[320px] text-sm leading-6 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                {isPaid
+                  ? `Aktif sampai ${expiryText}. Setelah kadaluarsa otomatis kembali ke Basic.`
+                  : expiryText}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {(isBlocked || error) && (
+          <div className={`rounded-3xl border px-4 py-3 text-sm shadow-sm ${isBlocked ? (isDark ? 'border-amber-400/20 bg-amber-400/10 text-amber-100' : 'border-amber-200 bg-amber-50 text-amber-900') : (isDark ? 'border-red-400/20 bg-red-400/10 text-red-100' : 'border-red-200 bg-red-50 text-red-700')}`}>
+            {isBlocked ? 'Akun ini sudah aktif di 3 device. Logout salah satu device lama dulu untuk melanjutkan di perangkat ini.' : error}
+          </div>
+        )}
+
+        <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className={`rounded-[28px] border p-5 shadow-sm ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Profil</p>
+                <h2 className="mt-1 text-2xl font-semibold">Data akun</h2>
+              </div>
+              <div className={`rounded-2xl p-3 ${isDark ? 'bg-blue-400/10 text-blue-200' : 'bg-blue-50 text-blue-600'}`}>
+                <Edit3 size={22} />
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+              <div>
+                <label className={`mb-2 block text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Username</label>
+                <input
+                  value={usernameDraft}
+                  onChange={(event) => onUsernameChange(event.target.value.slice(0, 24))}
+                  className={`h-14 w-full rounded-2xl border px-4 text-base outline-none transition-all focus:ring-4 ${isDark ? 'border-slate-700 bg-slate-950 text-slate-100 focus:border-blue-400 focus:ring-blue-400/10' : 'border-slate-200 bg-white text-slate-950 focus:border-blue-500 focus:ring-blue-500/10'}`}
+                  placeholder="Username"
+                />
+              </div>
+
+              <div>
+                <label className={`mb-2 block text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Email</label>
+                <div className={`flex h-14 items-center rounded-2xl border px-4 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                  <span className="truncate">{user.email || 'Belum ada email'}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onSaveUsername}
+                disabled={isSavingUsername || !usernameDraft.trim()}
+                className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSavingUsername ? <RefreshCw size={17} className="animate-spin" /> : <Save size={17} />}
+                Simpan
+              </button>
+            </div>
+          </div>
+
+          <div className={`rounded-[28px] border p-5 shadow-sm ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-start gap-4">
+              <div className={`rounded-2xl p-3 ${isDark ? 'bg-emerald-400/10 text-emerald-200' : 'bg-emerald-50 text-emerald-600'}`}>
+                <CalendarClock size={24} />
+              </div>
+              <div>
+                <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Masa berlaku</p>
+                <h2 className="mt-1 text-2xl font-semibold">{isPaid ? expiryText : 'Basic selamanya'}</h2>
+                <p className={`mt-2 text-sm leading-6 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {isPaid
+                    ? 'Tanggal ini dicek otomatis oleh server. Jika masa aktif habis, paket kembali ke Basic.'
+                    : 'Upgrade ke Pro atau Plus untuk limit lebih besar dan prioritas fitur.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className={`rounded-[28px] border p-5 shadow-sm ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Keamanan</p>
+              <h2 className="mt-1 text-2xl font-semibold">Device terhubung</h2>
+              <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Maksimal 3 device aktif. Tidak aktif 7 hari akan logout otomatis.</p>
+            </div>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${isDark ? 'bg-slate-800 text-slate-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3">
+            {devices.length === 0 ? (
+              <div className={`rounded-3xl border px-4 py-8 text-center text-sm ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+                Belum ada device yang tercatat.
+              </div>
+            ) : devices.map((device) => {
+              const isCurrent = device.id === currentDeviceId || device.isCurrent;
+              return (
+                <div key={device.id} className={`flex flex-col gap-3 rounded-3xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                  isDark ? 'border-slate-800 bg-slate-950/50 hover:bg-slate-950' : 'border-slate-200 bg-slate-50 hover:bg-white'
+                } ${!device.active ? 'opacity-55' : ''}`}>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className={`rounded-2xl p-3 ${isDark ? 'bg-slate-800 text-blue-300' : 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200'}`}>
+                      <MonitorSmartphone size={21} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{device.name}</p>
+                        {isCurrent && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">Device ini</span>}
+                        {!device.active && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">Keluar</span>}
+                      </div>
+                      <p className={`mt-1 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Aktif terakhir: {formatDeviceDate(device.lastActive)}</p>
+                      <p className="mt-1 line-clamp-1 text-xs text-slate-400">{device.userAgent || device.id}</p>
+                    </div>
+                  </div>
+                  {device.active && !isCurrent && (
+                    <button
+                      type="button"
+                      onClick={() => onLogoutDevice(device)}
+                      className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${isDark ? 'bg-red-400/10 text-red-200 hover:bg-red-400/20' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                    >
+                      <Trash2 size={15} />
+                      Logout device
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+};
+
+const ReauthDeviceModal: React.FC<{
+  deviceName: string;
+  password: string;
+  isDark: boolean;
+  error: string;
+  isLoading: boolean;
+  onPasswordChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}> = ({ deviceName, password, isDark, error, isLoading, onPasswordChange, onCancel, onConfirm }) => (
+  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+    <section className={`w-full max-w-md rounded-3xl border p-5 shadow-2xl ${isDark ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+      <div className="flex items-start gap-3">
+        <div className={`rounded-2xl p-2 ${isDark ? 'bg-blue-400/10 text-blue-200' : 'bg-blue-50 text-blue-600'}`}>
+          <Lock size={20} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Konfirmasi password</h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Masukkan password akun untuk logout device: <span className="font-semibold">{deviceName}</span>.</p>
+        </div>
+      </div>
+      {error && <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-100">{error}</p>}
+      <input
+        type="password"
+        value={password}
+        onChange={(event) => onPasswordChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') onConfirm();
+        }}
+        className={`mt-4 w-full rounded-2xl border px-4 py-3 text-sm outline-none transition-colors ${isDark ? 'border-slate-700 bg-slate-900 text-slate-100 focus:border-blue-400' : 'border-slate-200 bg-white text-slate-900 focus:border-blue-500'}`}
+        placeholder="Password akun"
+        autoFocus
+      />
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} disabled={isLoading} className={`rounded-full px-4 py-2 text-sm font-semibold ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>Batal</button>
+        <button type="button" onClick={onConfirm} disabled={isLoading || !password.trim()} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60">Konfirmasi</button>
+      </div>
+    </section>
+  </div>
+);
 
 const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: string; fallbackLines?: string[] }> = ({ step, steps, liveThinking, fallbackLines = FALLBACK_THINKING_LINES }) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -315,18 +758,31 @@ const App: React.FC = () => {
   // History State
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeView, setActiveView] = useState<AppView>('chat');
+  const [activeView, setActiveView] = useState<AppView>(() => getStoredActiveView());
   
   // Auth State
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('hidden');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [accountDevices, setAccountDevices] = useState<AccountDevice[]>([]);
+  const [currentDeviceId, setCurrentDeviceId] = useState('');
+  const [isDeviceLimitBlocked, setIsDeviceLimitBlocked] = useState(false);
+  const [isDeviceRefreshing, setIsDeviceRefreshing] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
+  const [reauthDevice, setReauthDevice] = useState<AccountDevice | null>(null);
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [isReauthLoading, setIsReauthLoading] = useState(false);
+  const [userRole, setUserRole] = useState<UserStatusRole>('basic');
+  const [roleExpiresAt, setRoleExpiresAt] = useState<string | null>(null);
+  const [accountUsernameDraft, setAccountUsernameDraft] = useState('');
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [isSubscribingPlan, setIsSubscribingPlan] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem('putra-theme') === 'dark' ? 'dark' : 'light';
   });
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-  const subscriptionBadge = 'BASIC';
+  const subscriptionBadge = userRole.toUpperCase();
   const isSendingRef = useRef(false);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -335,6 +791,10 @@ const App: React.FC = () => {
       chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, activeView);
+  }, [activeView]);
 
   useEffect(() => {
     const isDark = theme === 'dark';
@@ -390,14 +850,41 @@ const App: React.FC = () => {
       setUser(currentUser);
       if (currentUser) {
         try {
-          await ensureUserDocument(currentUser);
-          setAuthMode(currentUser.phoneNumber ? 'hidden' : 'phone');
+          const profile = await ensureUserDocument(currentUser);
+          const deviceId = getClientDeviceId();
+          const registration = await registerUserDevice(
+            currentUser.uid,
+            deviceId,
+            getClientDeviceName(),
+            getClientUserAgent(),
+          );
+
+          setUserRole(profile.status_role);
+          setRoleExpiresAt(profile.roleExpiresAt || null);
+          setAccountUsernameDraft(profile.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || '');
+          setCurrentDeviceId(deviceId);
+          setAccountDevices(registration.devices);
+          setIsDeviceLimitBlocked(!registration.allowed);
+          setAuthMode('hidden');
+
+          if (!registration.allowed) {
+            setActiveView('account');
+            setError('DEVICE_LIMIT: Akun ini sudah aktif di 3 device. Logout salah satu device lama dulu untuk memakai device ini.');
+            return;
+          }
+
           await loadHistory(currentUser.uid);
         } catch (err) {
           setError(err instanceof Error ? `Kesalahan Firestore: ${err.message}` : 'Kesalahan Firestore: gagal memuat riwayat chat.');
         }
       } else {
         setChatHistory([]);
+        setAccountDevices([]);
+        setCurrentDeviceId('');
+        setIsDeviceLimitBlocked(false);
+        setUserRole('basic');
+        setRoleExpiresAt(null);
+        setAccountUsernameDraft('');
         setAuthMode('login');
       }
     });
@@ -430,6 +917,91 @@ const App: React.FC = () => {
     }
   };
 
+
+  const refreshAccountDevices = useCallback(async () => {
+    if (!user) return;
+    const deviceId = currentDeviceId || getClientDeviceId();
+
+    setIsDeviceRefreshing(true);
+    setDeviceError('');
+    try {
+      const devices = await getUserDevices(user.uid, deviceId);
+      setCurrentDeviceId(deviceId);
+      setAccountDevices(devices);
+      setIsDeviceLimitBlocked(devices.filter((device) => device.active && device.id !== deviceId).length >= 3 && !devices.some((device) => device.active && device.id === deviceId));
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Gagal memuat daftar device.');
+    } finally {
+      setIsDeviceRefreshing(false);
+    }
+  }, [currentDeviceId, user]);
+
+  useEffect(() => {
+    if (!user || !currentDeviceId || isDeviceLimitBlocked) return;
+
+    const heartbeat = window.setInterval(() => {
+      updateUserDeviceHeartbeat(user.uid, currentDeviceId).catch((err) => {
+        console.warn('[Putra Account] Device heartbeat failed:', err);
+      });
+    }, 60_000);
+
+    return () => window.clearInterval(heartbeat);
+  }, [currentDeviceId, isDeviceLimitBlocked, user]);
+
+  const completeDeviceLogout = useCallback(async (device: AccountDevice) => {
+    if (!user) return;
+    await logoutUserDevice(user.uid, device.id);
+    const deviceId = currentDeviceId || getClientDeviceId();
+    const registration = await registerUserDevice(user.uid, deviceId, getClientDeviceName(), getClientUserAgent());
+    setCurrentDeviceId(deviceId);
+    setAccountDevices(registration.devices);
+    setIsDeviceLimitBlocked(!registration.allowed);
+    if (registration.allowed) {
+      setError(null);
+      await loadHistory(user.uid);
+    }
+  }, [currentDeviceId, user]);
+
+  const requestLogoutDevice = useCallback(async (device: AccountDevice) => {
+    if (!user || device.id === currentDeviceId) return;
+    setDeviceError('');
+
+    const providerIds = user.providerData.map((provider) => provider.providerId);
+    if (providerIds.includes('password')) {
+      setReauthPassword('');
+      setReauthDevice(device);
+      return;
+    }
+
+    try {
+      setIsReauthLoading(true);
+      await reauthenticateWithPopup(user, new GoogleAuthProvider());
+      await completeDeviceLogout(device);
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Verifikasi akun gagal.');
+    } finally {
+      setIsReauthLoading(false);
+    }
+  }, [completeDeviceLogout, currentDeviceId, user]);
+
+  const confirmPasswordDeviceLogout = useCallback(async () => {
+    if (!user || !reauthDevice || !user.email) return;
+    setIsReauthLoading(true);
+    setDeviceError('');
+
+    try {
+      const credential = EmailAuthProvider.credential(user.email, reauthPassword);
+      await reauthenticateWithCredential(user, credential);
+      await completeDeviceLogout(reauthDevice);
+      setReauthDevice(null);
+      setReauthPassword('');
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Password salah atau verifikasi gagal.');
+    } finally {
+      setIsReauthLoading(false);
+    }
+  }, [completeDeviceLogout, reauthDevice, reauthPassword, user]);
+
   const updateLocalHistory = useCallback((sessionId: string, title: string, sessionMessages: Message[]) => {
     const nextSession: ChatSession = {
       id: sessionId,
@@ -454,6 +1026,14 @@ const App: React.FC = () => {
       return;
     }
 
+    if (isDeviceLimitBlocked) {
+      setActiveView('account');
+      setError('DEVICE_LIMIT: Akun ini sudah aktif di 3 device. Logout salah satu device lama dulu.');
+      return;
+    }
+
+    isSendingRef.current = true;
+
     const newUserMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -465,7 +1045,6 @@ const App: React.FC = () => {
     const updatedMessagesAfterUser = [...messages, newUserMessage];
     const isVisionRequest = attachments.some((attachment) => attachment.mimeType.startsWith('image/'));
     const shouldCreateDocx = wantsDocxFile(text);
-    isSendingRef.current = true;
     setActiveThinkingSteps(getThinkingSteps(text, attachments));
     setActiveThinkingFallbackLines(getFallbackThinkingLines(text));
     setActiveThinkingText('');
@@ -510,7 +1089,11 @@ const App: React.FC = () => {
       let hasStreamingContent = false;
       let latestStreamText = '';
 
+      const authToken = await user.getIdToken();
       const aiResponse = await geminiService.sendMessage(text, attachments, messages, {
+        authToken,
+        userId: user.uid,
+        sessionId,
         onThinking: setActiveThinkingText,
         onContent: (content) => {
           if (isVisionRequest) return;
@@ -590,7 +1173,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, currentSessionId, user, chatHistory, updateLocalHistory, isLoading, isTypingResponse, scrollToNewestUserMessage]);
+  }, [messages, currentSessionId, user, userRole, chatHistory, updateLocalHistory, isLoading, isTypingResponse, isDeviceLimitBlocked, scrollToNewestUserMessage]);
 
   const handleTypingComplete = useCallback((messageId: string) => {
     setMessages((currentMessages) =>
@@ -630,6 +1213,14 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
+  const handleOpenAccount = () => {
+    setActiveView('account');
+    setError(null);
+    setShowUserMenu(false);
+    setIsSidebarOpen(false);
+    refreshAccountDevices();
+  };
+
   const handleOpenVoice = () => {
     setActiveView('voice');
     setError(null);
@@ -648,14 +1239,71 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
+  const handleSaveUsername = useCallback(async () => {
+    if (!user) return;
+    const nextName = accountUsernameDraft.trim().replace(/\s+/g, ' ').slice(0, 24);
+    if (!nextName) {
+      setDeviceError('Username tidak boleh kosong.');
+      return;
+    }
+
+    setIsSavingUsername(true);
+    setDeviceError('');
+    try {
+      await updateProfile(user, { displayName: nextName });
+      await updateUserDisplayName(user.uid, nextName);
+      setAccountUsernameDraft(nextName);
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Gagal menyimpan username.');
+    } finally {
+      setIsSavingUsername(false);
+    }
+  }, [accountUsernameDraft, user]);
+
+  const handleSelectPlan = useCallback(async (plan: 'pro' | 'plus') => {
+    if (!user) {
+      setAuthMode('login');
+      return;
+    }
+
+    setIsSubscribingPlan(true);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/account/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plan, months: 1 }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Gagal mengaktifkan paket.');
+      }
+
+      setUserRole(data.profile.status_role);
+      setRoleExpiresAt(data.profile.roleExpiresAt || null);
+      setActiveView('account');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengaktifkan paket.');
+    } finally {
+      setIsSubscribingPlan(false);
+    }
+  }, [user]);
+
   const handleLogout = async () => {
+    if (user && currentDeviceId) {
+      await logoutUserDevice(user.uid, currentDeviceId).catch(() => undefined);
+    }
     await signOut(auth);
     setShowUserMenu(false);
     handleNewChat();
   };
 
   const isEmptyChat = messages.length === 0;
-  const username = user?.email?.split('@')[0] ?? '';
+  const username = user?.displayName || accountUsernameDraft || user?.email?.split('@')[0] || '';
   const isDarkTheme = theme === 'dark';
 
   return (
@@ -669,6 +1317,7 @@ const App: React.FC = () => {
         onClose={() => setIsSidebarOpen(false)} 
         onNewChat={handleNewChat}
         onOpenPackages={handleOpenPackages}
+        onOpenAccount={handleOpenAccount}
         onOpenVoice={handleOpenVoice}
         onOpenPpt={handleOpenPpt}
         onOpenConvert={handleOpenConvert}
@@ -741,6 +1390,16 @@ const App: React.FC = () => {
                     <div className="border-b border-slate-100 px-4 py-2 dark:border-slate-800">
                       <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{user.email}</p>
                     </div>
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        handleOpenAccount();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <ShieldCheck size={16} />
+                      Informasi akun
+                    </button>
                     <button 
                       onClick={handleLogout}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -757,7 +1416,25 @@ const App: React.FC = () => {
 
         {/* Chat Area */}
         {activeView === 'packages' ? (
-          <PutraPackages />
+          <PutraPackages userRole={userRole} roleExpiresAt={roleExpiresAt} isSubscribing={isSubscribingPlan} onSelectPlan={handleSelectPlan} />
+        ) : activeView === 'account' && user ? (
+          <AccountPage
+            user={user}
+            userRole={userRole}
+            roleExpiresAt={roleExpiresAt}
+            devices={accountDevices}
+            currentDeviceId={currentDeviceId}
+            isDark={isDarkTheme}
+            isBlocked={isDeviceLimitBlocked}
+            error={deviceError}
+            usernameDraft={accountUsernameDraft}
+            isSavingUsername={isSavingUsername}
+            isRefreshing={isDeviceRefreshing}
+            onUsernameChange={setAccountUsernameDraft}
+            onSaveUsername={handleSaveUsername}
+            onRefresh={refreshAccountDevices}
+            onLogoutDevice={requestLogoutDevice}
+          />
         ) : activeView === 'convert-word-pdf' ? (
           <PutraConvert mode="word-pdf" />
         ) : activeView === 'convert-ppt-pdf' ? (
@@ -897,12 +1574,28 @@ const App: React.FC = () => {
 
       </div>
 
+      {reauthDevice && (
+        <ReauthDeviceModal
+          deviceName={reauthDevice.name}
+          password={reauthPassword}
+          isDark={isDarkTheme}
+          error={deviceError}
+          isLoading={isReauthLoading}
+          onPasswordChange={setReauthPassword}
+          onCancel={() => {
+            setReauthDevice(null);
+            setReauthPassword('');
+          }}
+          onConfirm={confirmPasswordDeviceLogout}
+        />
+      )}
+
       {/* Auth Modal */}
       <AuthModal 
         mode={authMode} 
-        onClose={() => user?.phoneNumber && setAuthMode('hidden')} 
+        onClose={() => user && setAuthMode('hidden')} 
         onChangeMode={setAuthMode} 
-        canClose={!!user?.phoneNumber}
+        canClose={!!user}
       />
 
     </div>

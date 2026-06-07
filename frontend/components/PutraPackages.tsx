@@ -1,4 +1,5 @@
 import React from 'react';
+import { UserStatusRole } from '../types';
 import { Check, Crown, Sparkles, Zap } from 'lucide-react';
 
 const packages = [
@@ -75,7 +76,27 @@ const toneClasses = {
   },
 };
 
-export const PutraPackages: React.FC = () => {
+interface PutraPackagesProps {
+  userRole: UserStatusRole;
+  roleExpiresAt?: string | null;
+  isSubscribing?: boolean;
+  onSelectPlan: (plan: 'pro' | 'plus') => void;
+}
+
+const formatExpiry = (value?: string | null) => {
+  if (!value) return 'Tidak ada masa berlaku';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Tanggal tidak valid';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+export const PutraPackages: React.FC<PutraPackagesProps> = ({ userRole, roleExpiresAt, isSubscribing = false, onSelectPlan }) => {
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-white">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 md:px-6 lg:px-8">
@@ -91,7 +112,7 @@ export const PutraPackages: React.FC = () => {
               </p>
             </div>
             <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600">
-              Basic aktif untuk semua akun
+              {userRole === 'basic' ? 'Basic aktif untuk semua akun' : `${userRole.toUpperCase()} aktif sampai ${formatExpiry(roleExpiresAt)}`}
             </div>
           </div>
         </section>
@@ -137,9 +158,14 @@ export const PutraPackages: React.FC = () => {
 
                 <button
                   type="button"
-                  className={`mt-6 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${tone.button}`}
+                  disabled={isSubscribing || item.name.toLowerCase() === userRole}
+                  onClick={() => {
+                    if (item.name === 'Pro') onSelectPlan('pro');
+                    if (item.name === 'Plus') onSelectPlan('plus');
+                  }}
+                  className={`mt-6 rounded-xl px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${tone.button}`}
                 >
-                  {item.action}
+                  {item.name.toLowerCase() === userRole ? 'Sedang aktif' : isSubscribing && item.name !== 'Basic' ? 'Memproses...' : item.action}
                 </button>
               </article>
             );

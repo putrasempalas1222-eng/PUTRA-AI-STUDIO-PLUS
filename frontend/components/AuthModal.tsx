@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyRound, Phone, X } from 'lucide-react';
+import { Apple, Eye, EyeOff, KeyRound, Phone, X } from 'lucide-react';
 import { FirebaseError } from 'firebase/app';
 import {
   ConfirmationResult,
   GoogleAuthProvider,
+  OAuthProvider,
   RecaptchaVerifier,
   createUserWithEmailAndPassword,
   linkWithPhoneNumber,
@@ -11,6 +12,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updateProfile,
 } from 'firebase/auth';
 import { auth, ensureUserDocument } from '../services/firebase';
 
@@ -24,6 +26,7 @@ interface AuthModalProps {
 }
 
 const googleProvider = new GoogleAuthProvider();
+const appleProvider = new OAuthProvider('apple.com');
 const countryOptions = [
   { code: 'ID', name: 'Indonesia', dialCode: '+62' },
   { code: 'AF', name: 'Afghanistan', dialCode: '+93' },
@@ -183,8 +186,11 @@ function normalizePhoneNumber(value: string, dialCode: string) {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMode, canClose = true }) => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [countryCode, setCountryCode] = useState('ID');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -201,6 +207,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
       setConfirmation(null);
       setOtpCode('');
     }
+  }, [mode]);
+
+  useEffect(() => {
+    setShowPassword(false);
+    setError('');
+    setSuccessMsg('');
   }, [mode]);
 
   useEffect(() => {
@@ -340,6 +352,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
     otpInputRefs.current[Math.min(pastedCode.length, 5)]?.focus();
   };
 
+  const sanitizeNameInput = (value: string) => value
+    .replace(/[^\p{L}\s'-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 12);
+
+  const getCleanName = (value: string) => value.trim().replace(/\s+/g, ' ');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     resetMessages();
@@ -358,13 +377,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
         return;
       }
 
+      const cleanFirstName = getCleanName(firstName);
+      const cleanLastName = getCleanName(lastName);
+
+      if (mode === 'register') {
+        if (!cleanFirstName || !cleanLastName) {
+          setError('Nama depan dan nama belakang wajib diisi.');
+          return;
+        }
+
+        if (cleanFirstName.length > 12 || cleanLastName.length > 12) {
+          setError('Nama depan dan nama belakang maksimal 12 karakter.');
+          return;
+        }
+      }
+
       if (mode === 'login') {
-        const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-        onChangeMode(credential.user.phoneNumber ? 'hidden' : 'phone');
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
+        onChangeMode('hidden');
       } else if (mode === 'register') {
         const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+        await updateProfile(credential.user, {
+          displayName: `${cleanFirstName} ${cleanLastName}`,
+        });
         await ensureUserDocument(credential.user);
-        onChangeMode('phone');
+        onChangeMode('hidden');
       } else if (mode === 'forgot') {
         await sendPasswordResetEmail(auth, normalizedEmail);
         setSuccessMsg('Email reset kata sandi sudah dikirim. Periksa kotak masuk Anda.');
@@ -377,21 +414,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleProviderLogin = async (provider: GoogleAuthProvider | OAuthProvider, providerName: 'Google' | 'Apple') => {
     resetMessages();
     setLoading(true);
 
     try {
-      const credential = await signInWithPopup(auth, googleProvider);
+      const credential = await signInWithPopup(auth, provider);
       await ensureUserDocument(credential.user);
-      onChangeMode(credential.user.phoneNumber ? 'hidden' : 'phone');
+      onChangeMode('hidden');
     } catch (err) {
-      console.error('[PUTRA Auth] Google login failed:', err);
+      console.error(`[PUTRA Auth] ${providerName} login failed:`, err);
       setError(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
+  const handleGoogleLogin = () => handleProviderLogin(googleProvider, 'Google');
+  const handleAppleLogin = () => handleProviderLogin(appleProvider, 'Apple');
 
   const handleSendOtp = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -616,15 +656,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
             <>
               {mode !== 'forgot' && (
                 <>
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-70"
-                  >
-                    <KeyRound size={18} />
-                    Masuk dengan Google
-                  </button>
+                  <div className="mb-4 space-y-3">
+                    <button
+                      type="button"
+                      onClick={handleAppleLogin}
+                      disabled={loading}
+                      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-900 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 disabled:opacity-70"
+                    >
+                      <Apple size={19} strokeWidth={2.4} />
+                      Masuk dengan Apple
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      disabled={loading}
+                      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-70"
+                    >
+                      <KeyRound size={18} />
+                      Masuk dengan Google
+                    </button>
+                  </div>
 
                   <div className="mb-4 flex items-center gap-3 text-xs font-medium text-slate-400">
                     <span className="h-px flex-1 bg-slate-200" />
@@ -635,6 +687,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {mode === 'register' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Nama Depan</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          maxLength={12}
+                          value={firstName}
+                          onChange={(event) => setFirstName(sanitizeNameInput(event.target.value))}
+                          className="w-full rounded-xl border border-slate-200 px-4 py-2.5 pr-14 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                          placeholder="Nama depan"
+                        />
+                        <span className="pointer-events-none absolute bottom-2 right-3 rounded-full bg-white/90 px-1.5 text-[10px] font-medium leading-4 text-slate-400 shadow-sm ring-1 ring-slate-100">
+                          {firstName.length}/12
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Nama Belakang</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          maxLength={12}
+                          value={lastName}
+                          onChange={(event) => setLastName(sanitizeNameInput(event.target.value))}
+                          className="w-full rounded-xl border border-slate-200 px-4 py-2.5 pr-14 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                          placeholder="Nama belakang"
+                        />
+                        <span className="pointer-events-none absolute bottom-2 right-3 rounded-full bg-white/90 px-1.5 text-[10px] font-medium leading-4 text-slate-400 shadow-sm ring-1 ring-slate-100">
+                          {lastName.length}/12
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">Alamat Email</label>
                   <input
@@ -650,14 +741,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
                 {mode !== 'forgot' && (
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">Kata Sandi</label>
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                      placeholder="********"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 pr-12 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        placeholder="********"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((value) => !value)}
+                        className="absolute inset-y-0 right-2 flex w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                        title={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
                 )}
 

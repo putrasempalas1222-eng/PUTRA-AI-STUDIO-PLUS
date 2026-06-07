@@ -1,14 +1,15 @@
 ﻿import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, FileText, KeyRound, MessageSquare, Mic2, Package, Plus, Repeat2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, KeyRound, MessageSquare, Mic2, Package, Plus, Repeat2, UserCircle, X } from 'lucide-react';
 import { ChatSession } from '../types';
 
-export type AppView = 'chat' | 'voice' | 'ppt' | 'packages' | 'convert-word-pdf' | 'convert-ppt-pdf';
+export type AppView = 'chat' | 'voice' | 'ppt' | 'packages' | 'account' | 'convert-word-pdf' | 'convert-ppt-pdf';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onNewChat: () => void;
   onOpenPackages: () => void;
+  onOpenAccount: () => void;
   onOpenVoice: () => void;
   onOpenPpt: () => void;
   onOpenConvert: (view: 'convert-word-pdf' | 'convert-ppt-pdf') => void;
@@ -24,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose, 
   onNewChat, 
   onOpenPackages,
+  onOpenAccount,
   onOpenVoice,
   onOpenPpt,
   onOpenConvert,
@@ -106,6 +108,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Package size={16} className={`flex-shrink-0 ${activeView === 'packages' ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-75'}`} />
                 <span className={`truncate text-sm font-medium ${activeView === 'packages' ? 'text-slate-900 dark:text-blue-100' : ''}`}>Paket</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenAccount}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
+                  activeView === 'account'
+                    ? 'bg-blue-100 text-slate-900 ring-1 ring-blue-200 dark:bg-blue-500/20 dark:text-blue-100 dark:ring-blue-400/20'
+                    : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
+                }`}
+              >
+                <UserCircle size={16} className={`flex-shrink-0 ${activeView === 'account' ? 'text-blue-700 opacity-100 dark:text-blue-200' : 'opacity-75'}`} />
+                <span className={`truncate text-sm font-medium ${activeView === 'account' ? 'text-slate-900 dark:text-blue-100' : ''}`}>Informasi Akun</span>
               </button>
             </div>
           </div>

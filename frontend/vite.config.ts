@@ -6,7 +6,7 @@ export default defineConfig(() => {
       base: './',
       server: {
         proxy: {
-          '/api/chat': 'http://localhost:5000',
+          '/api': 'http://localhost:5000',
         },
       },
       plugins: react(),
