@@ -16,7 +16,7 @@ const viteEnv = (import.meta as unknown as { env?: Record<string, string | undef
 
 const PRIMARY_OLLAMA_CHAT_URL =
   viteEnv.VITE_OLLAMA_CHAT_URL ||
-  'http://localhost:11434/api/chat';
+  'https://rotunda-elderly-alto.ngrok-free.dev/api/chat';
 const FALLBACK_CHAT_PROXY_URL =
   viteEnv.VITE_FALLBACK_CHAT_PROXY_URL ||
   'https://api-mzmdqh3n6a-uc.a.run.app/api/chat';
