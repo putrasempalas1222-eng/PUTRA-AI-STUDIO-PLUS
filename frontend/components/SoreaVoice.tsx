@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, Square, Volume2, VolumeX, Wand2 } from 'lucide-react';
-import { geminiService } from '../services/geminiService';
+import { geminiService } from '../services/AiServices';
 
 type VoiceRole = 'user' | 'model';
 type VoiceStatus = 'idle' | 'listening' | 'thinking' | 'speaking';

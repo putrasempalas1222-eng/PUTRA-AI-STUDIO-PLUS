@@ -34,6 +34,12 @@
   <link rel="apple-touch-icon"
     href="https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09">
 
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      darkMode: 'class'
+    };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     if ('serviceWorker' in navigator) {
@@ -116,6 +122,10 @@
       color: #1e293b;
     }
 
+    .dark .markdown-body strong {
+      color: #f8fafc;
+    }
+
     .markdown-body h1,
     .markdown-body h2,
     .markdown-body h3 {
@@ -123,6 +133,12 @@
       margin-top: 1.5em;
       margin-bottom: 0.75em;
       color: #0f172a;
+    }
+
+    .dark .markdown-body h1,
+    .dark .markdown-body h2,
+    .dark .markdown-body h3 {
+      color: #f8fafc;
     }
 
     .markdown-body h3 {
@@ -137,6 +153,11 @@
       font-family: monospace;
     }
 
+    .dark .markdown-body code {
+      background-color: #1e293b;
+      color: #e2e8f0;
+    }
+
     .markdown-body pre {
       background-color: #f8fafc;
       padding: 1em;
@@ -144,6 +165,104 @@
       overflow-x: auto;
       margin-bottom: 1em;
       border: 1px solid #e2e8f0;
+    }
+
+    .dark .markdown-body pre {
+      background-color: #0f172a;
+      border-color: #334155;
+    }
+
+    html[data-theme="light"],
+    html[data-theme="light"] body,
+    html[data-theme="light"] #root {
+      background: #ffffff !important;
+      color: #1e293b !important;
+      color-scheme: light !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root,
+    html[data-theme="light"] .putra-theme-root main,
+    html[data-theme="light"] .putra-theme-root section {
+      background-color: #ffffff !important;
+      color: #1e293b !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:bg-slate-950,
+    html[data-theme="light"] .putra-theme-root .dark\:bg-slate-950\/90,
+    html[data-theme="light"] .putra-theme-root .dark\:bg-slate-900 {
+      background-color: #ffffff !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:bg-slate-800,
+    html[data-theme="light"] .putra-theme-root .dark\:hover\:bg-slate-800:hover,
+    html[data-theme="light"] .putra-theme-root .dark\:hover\:bg-slate-700:hover {
+      background-color: #f1f5f9 !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:text-slate-100,
+    html[data-theme="light"] .putra-theme-root .dark\:text-slate-200,
+    html[data-theme="light"] .putra-theme-root .dark\:text-slate-300,
+    html[data-theme="light"] .putra-theme-root .dark\:text-slate-400 {
+      color: #334155 !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:placeholder-slate-500::placeholder {
+      color: #64748b !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:border-slate-700,
+    html[data-theme="light"] .putra-theme-root .dark\:border-slate-800 {
+      border-color: #e2e8f0 !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .markdown-body,
+    html[data-theme="light"] .putra-theme-root .markdown-body p,
+    html[data-theme="light"] .putra-theme-root .markdown-body li {
+      color: #1e293b !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .markdown-body strong,
+    html[data-theme="light"] .putra-theme-root .markdown-body h1,
+    html[data-theme="light"] .putra-theme-root .markdown-body h2,
+    html[data-theme="light"] .putra-theme-root .markdown-body h3 {
+      color: #0f172a !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:from-slate-950 {
+      --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important;
+      --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+      --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:via-slate-950 {
+      --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+      --tw-gradient-stops: var(--tw-gradient-from), #ffffff var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .dark\:to-transparent {
+      --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .bg-slate-950,
+    html[data-theme="light"] .putra-theme-root .bg-slate-950\/90,
+    html[data-theme="light"] .putra-theme-root .bg-slate-950\/92 {
+      background-color: #ffffff !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .text-slate-100,
+    html[data-theme="light"] .putra-theme-root .text-slate-200 {
+      color: #1e293b !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .border-slate-800,
+    html[data-theme="light"] .putra-theme-root .border-slate-700 {
+      border-color: #e2e8f0 !important;
+    }
+
+    html[data-theme="light"] .putra-theme-root .shadow-black\/20,
+    html[data-theme="light"] .putra-theme-root .shadow-black\/40 {
+      --tw-shadow-color: rgb(15 23 42 / 0.12) !important;
+      --tw-shadow: var(--tw-shadow-colored) !important;
     }
 
     .markdown-body pre code {

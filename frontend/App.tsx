@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Message, ChatSession, Attachment } from './types';
-import { geminiService } from './services/geminiService';
+import { geminiService } from './services/AiServices';
 import { auth, ensureUserDocument, getUserChatHistory, saveChatSession } from './services/firebase';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { ChatMessage } from './components/ChatMessage';
@@ -11,12 +11,26 @@ import { PutraPpt } from './components/PutraPpt';
 import { PutraPackages } from './components/PutraPackages';
 import { PutraConvert } from './components/PutraConvert';
 import { AuthModal, AuthMode } from './components/AuthModal';
-import { ChevronDown, Menu, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
+import { ChevronDown, Menu, Moon, Sparkles, Sun, LogOut, User as UserIcon } from 'lucide-react';
 
 const THINKING_STEPS = [
   'Memahami permintaan',
   'Menentukan tujuan',
   'Menyusun jawaban',
+];
+
+const FALLBACK_THINKING_LINES = [
+  'Connecting to PUTRA AI STUDIO...',
+  'Understanding the request...',
+  'Checking conversation context...',
+  'Preparing the best answer...',
+];
+
+const INDONESIAN_THINKING_LINES = [
+  'Menghubungkan ke PUTRA AI STUDIO...',
+  'Membaca maksud pertanyaan...',
+  'Menimbang konteks percakapan...',
+  'Menyusun jawaban terbaik...',
 ];
 
 const IMAGE_GENERATION_STEPS = [
@@ -36,6 +50,14 @@ const FILE_ANALYSIS_STEPS = [
   'Mengambil poin penting',
   'Menyusun analisis file',
 ];
+function isLikelyIndonesian(text: string) {
+  const normalized = ` ${text.toLowerCase()} `;
+  return /\b(apa|apakah|siapa|bagaimana|kenapa|mengapa|jelaskan|tolong|buatkan|perbaiki|gambar|file|saya|kamu|yang|dan|atau|dengan|untuk|dari|ini|itu)\b/.test(normalized);
+}
+
+function getFallbackThinkingLines(prompt: string) {
+  return isLikelyIndonesian(prompt) ? INDONESIAN_THINKING_LINES : FALLBACK_THINKING_LINES;
+}
 
 const APP_ICON_URL = 'https://firebasestorage.googleapis.com/v0/b/play-integrity-2adpr7x4a8xhyex.firebasestorage.app/o/Desain_tanpa_judul-removebg-preview.png?alt=media&token=d5be2a46-6352-48a2-89ae-e89574279f09';
 
@@ -100,19 +122,36 @@ const getThinkingSteps = (text: string, attachments: Attachment[]) => {
 
 const isImageGenerationStepSet = (steps: string[]) => steps === IMAGE_GENERATION_STEPS;
 
-const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: string }> = ({ step, steps, liveThinking }) => {
+const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: string; fallbackLines?: string[] }> = ({ step, steps, liveThinking, fallbackLines = FALLBACK_THINKING_LINES }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [typedText, setTypedText] = useState('');
+  const [fallbackIndex, setFallbackIndex] = useState(0);
   const title = steps === IMAGE_ANALYSIS_STEPS
     ? 'Menganalisis gambar'
     : steps === FILE_ANALYSIS_STEPS
       ? 'Menganalisis file'
       : 'Memikirkan jawaban';
 
-  const detailText = liveThinking?.trim() || 'Menghubungkan ke PUTRA AI STUDIO...';
+  const hasLiveThinking = Boolean(liveThinking?.trim());
+  const detailText = hasLiveThinking ? liveThinking!.trim() : fallbackLines[fallbackIndex];
+
+  useEffect(() => {
+    if (hasLiveThinking) return;
+
+    const timer = window.setInterval(() => {
+      setFallbackIndex((index) => (index + 1) % fallbackLines.length);
+    }, 450);
+
+    return () => window.clearInterval(timer);
+  }, [fallbackLines.length, hasLiveThinking]);
 
   useEffect(() => {
     if (!isOpen) return;
+
+    if (hasLiveThinking) {
+      setTypedText(detailText);
+      return;
+    }
 
     if (!detailText.startsWith(typedText)) {
       setTypedText('');
@@ -127,10 +166,10 @@ const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: s
       if (index >= detailText.length) {
         window.clearInterval(timer);
       }
-    }, 24);
+    }, 8);
 
     return () => window.clearInterval(timer);
-  }, [detailText, isOpen, typedText]);
+  }, [detailText, hasLiveThinking, isOpen, typedText]);
 
   return (
     <div className="flex w-full mb-8 justify-start">
@@ -148,21 +187,21 @@ const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: s
           <button
             type="button"
             onClick={() => setIsOpen((open) => !open)}
-            className="flex items-center gap-2 text-left text-slate-700 transition-colors hover:text-slate-950"
+            className="flex items-center gap-2 text-left text-slate-700 transition-colors hover:text-slate-950 dark:text-slate-200 dark:hover:text-white"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
             <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
             <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            <p className="text-sm font-semibold text-slate-800">{title}</p>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
             <ChevronDown
               size={15}
               className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
             />
           </button>
           {isOpen && (
-            <p className="mt-1 min-h-5 text-sm leading-relaxed text-slate-500">
+            <p className="mt-1 min-h-5 max-w-3xl text-[13px] font-normal leading-6 text-slate-500/85 dark:text-slate-400/85">
               {typedText}
-              <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-slate-400" />
+              <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-slate-400 dark:bg-slate-500" />
             </p>
           )}
         </div>
@@ -207,6 +246,7 @@ const App: React.FC = () => {
   const [thinkingStep, setThinkingStep] = useState(0);
   const [activeThinkingSteps, setActiveThinkingSteps] = useState(THINKING_STEPS);
   const [activeThinkingText, setActiveThinkingText] = useState('');
+  const [activeThinkingFallbackLines, setActiveThinkingFallbackLines] = useState(FALLBACK_THINKING_LINES);
   const [error, setError] = useState<string | null>(null);
   
   // History State
@@ -218,10 +258,32 @@ const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('hidden');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'light';
+    return window.localStorage.getItem('putra-theme') === 'dark' ? 'dark' : 'light';
+  });
   const subscriptionBadge = 'BASIC';
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const isSendingRef = useRef(false);
+
+  useEffect(() => {
+    const isDark = theme === 'dark';
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+    }
+    document.documentElement.dataset.theme = theme;
+    document.body.dataset.theme = theme;
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    document.body.style.colorScheme = isDark ? 'dark' : 'light';
+    window.localStorage.setItem('putra-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const setAppHeight = () => {
@@ -262,12 +324,23 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const updateAutoScrollState = useCallback(() => {
+    const container = chatScrollRef.current;
+    if (!container) {
+      shouldAutoScrollRef.current = true;
+      return;
     }
-  }, [messages, isLoading]);
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 140;
+  }, []);
+
+  // Scroll to bottom only while the user is already near the bottom.
+  useEffect(() => {
+    if (messages.length > 0 && shouldAutoScrollRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: isTypingResponse ? 'auto' : 'smooth' });
+    }
+  }, [messages, isLoading, isTypingResponse]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -328,7 +401,9 @@ const App: React.FC = () => {
     const updatedMessagesAfterUser = [...messages, newUserMessage];
     const shouldCreateDocx = wantsDocxFile(text);
     isSendingRef.current = true;
+    shouldAutoScrollRef.current = true;
     setActiveThinkingSteps(getThinkingSteps(text, attachments));
+    setActiveThinkingFallbackLines(getFallbackThinkingLines(text));
     setActiveThinkingText('');
     setMessages(updatedMessagesAfterUser);
     setIsLoading(true);
@@ -366,30 +441,77 @@ const App: React.FC = () => {
     }
 
     try {
+      const streamingMessageId = (Date.now() + 1).toString();
+      let hasStreamingContent = false;
+      let latestStreamText = '';
+
       const aiResponse = await geminiService.sendMessage(text, attachments, messages, {
         onThinking: setActiveThinkingText,
+        onContent: (content) => {
+          const cleanContent = content.trim();
+          if (!cleanContent) return;
+
+          hasStreamingContent = true;
+          latestStreamText = cleanContent;
+          setActiveThinkingText('');
+          setIsLoading(false);
+          setIsTypingResponse(false);
+          setMessages((currentMessages) => {
+            const streamingMessage: Message = {
+              id: streamingMessageId,
+              role: 'model',
+              text: cleanContent,
+              timestamp: new Date(),
+              imageBase64: '',
+              mode: attachments.some((attachment) => attachment.mimeType.startsWith('image/')) ? 'vision' : 'text',
+              downloadDocx: shouldCreateDocx,
+              docxTitle: shouldCreateDocx ? getDocxTitle(text) : undefined,
+              animateTyping: false,
+            };
+
+            if (currentMessages.some((message) => message.id === streamingMessageId)) {
+              return currentMessages.map((message) =>
+                message.id === streamingMessageId ? { ...message, ...streamingMessage } : message,
+              );
+            }
+
+            return [...currentMessages, streamingMessage];
+          });
+        },
       });
       
       const newModelMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: streamingMessageId,
         role: 'model',
-        text: aiResponse.text,
+        text: aiResponse.text || latestStreamText,
         timestamp: new Date(),
         imageBase64: aiResponse.imageBase64,
         mode: aiResponse.mode,
         downloadDocx: shouldCreateDocx,
         docxTitle: shouldCreateDocx ? getDocxTitle(text) : undefined,
-        animateTyping: true,
+        animateTyping: !hasStreamingContent,
       };
       
       const finalMessages = [...updatedMessagesAfterUser, newModelMessage];
-      setIsTypingResponse(true);
-      setMessages(finalMessages);
+      setIsTypingResponse(!hasStreamingContent);
+      setMessages((currentMessages) => {
+        if (currentMessages.some((message) => message.id === streamingMessageId)) {
+          return currentMessages.map((message) =>
+            message.id === streamingMessageId ? newModelMessage : message,
+          );
+        }
+
+        return [...currentMessages, newModelMessage];
+      });
       updateLocalHistory(sessionId, sessionTitle, finalMessages);
 
       // Save to Firebase if logged in
       if (user && sessionId) {
         await saveChatSession(user.uid, sessionId, sessionTitle, finalMessages);
+      }
+
+      if (hasStreamingContent) {
+        isSendingRef.current = false;
       }
 
     } catch (err) {
@@ -465,9 +587,12 @@ const App: React.FC = () => {
 
   const isEmptyChat = messages.length === 0;
   const username = user?.email?.split('@')[0] ?? '';
+  const isDarkTheme = theme === 'dark';
 
   return (
-    <div className="flex h-[var(--app-height,100dvh)] w-full overflow-hidden bg-white font-sans">
+    <div className={`putra-theme-root flex h-[var(--app-height,100dvh)] w-full overflow-hidden font-sans transition-colors ${
+      theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-white text-slate-800'
+    }`}>
       
       {/* Sidebar */}
       <Sidebar 
@@ -489,16 +614,16 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col h-full min-h-0 relative min-w-0">
         
         {/* Header */}
-        <header className={`sticky top-0 z-10 flex items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md md:px-6 md:pb-4 md:pt-[calc(env(safe-area-inset-top)+1rem)] ${
-          isEmptyChat
-            ? 'border-b border-slate-100/70 bg-white/90'
+        <header className={`sticky top-0 z-10 flex items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md transition-colors md:px-6 md:pb-4 md:pt-[calc(env(safe-area-inset-top)+1rem)] ${
+          isDarkTheme
+            ? 'border-b border-slate-800 bg-slate-950/92'
             : 'border-b border-slate-100/70 bg-white/90'
         }`}>
           <div className="flex min-w-0 items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`rounded-full p-2 transition-colors ${
-                isEmptyChat ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-600 hover:bg-slate-100'
+                isDarkTheme ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
               }`}
               aria-label="Buka riwayat chat"
             >
@@ -509,7 +634,7 @@ const App: React.FC = () => {
               className="min-w-0 flex items-center gap-2 text-left"
               onClick={handleNewChat}
             >
-              <span className={`truncate text-lg font-semibold md:text-xl ${isEmptyChat ? 'text-slate-600' : 'text-slate-600'}`}>
+              <span className={`truncate text-lg font-semibold md:text-xl ${isDarkTheme ? 'text-slate-200' : 'text-slate-700'}`}>
                 PUTRA AI PLUS
               </span>
               <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold leading-4 text-blue-700">
@@ -519,6 +644,19 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 relative">
+            <button
+              type="button"
+              onClick={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition-colors ${
+                isDarkTheme
+                  ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              }`}
+              title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}
+              aria-label={theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             {user ? (
               <div className="relative">
                 <button 
@@ -530,13 +668,13 @@ const App: React.FC = () => {
                 
                 {/* User Dropdown Menu */}
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50">
-                    <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-sm font-medium text-slate-800 truncate">{user.email}</p>
+                  <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl border border-slate-100 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                    <div className="border-b border-slate-100 px-4 py-2 dark:border-slate-800">
+                      <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{user.email}</p>
                     </div>
                     <button 
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-slate-50 flex items-center gap-2"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <LogOut size={16} />
                       Keluar
@@ -566,27 +704,40 @@ const App: React.FC = () => {
         ) : activeView === 'ppt' ? (
           <PutraPpt />
         ) : (
-        <main className={`relative flex-1 min-h-0 overflow-y-auto overscroll-contain ${isEmptyChat ? '' : 'pb-64 md:pb-56'}`}>
+        <main ref={chatScrollRef} onScroll={updateAutoScrollState} className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain transition-colors ${
+          isDarkTheme ? 'bg-slate-950' : 'bg-white'
+        } ${isEmptyChat ? '' : 'pb-64 md:pb-56'}`}>
           {isEmptyChat ? (
             // Empty State / Greeting
-            <div className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
+            <div className={`relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10 transition-colors ${
+              theme === 'dark' ? 'bg-slate-950' : 'bg-white'
+            }`}>
               <div
-                className="pointer-events-none absolute inset-0"
+                className={`pointer-events-none absolute inset-0 ${theme === 'dark' ? 'hidden' : 'block'}`}
                 style={{
-                  background:
-                    'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.18) 0%, rgba(147, 197, 253, 0.12) 28%, rgba(255, 255, 255, 0.78) 58%, #ffffff 100%)',
+                  background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.18) 0%, rgba(147, 197, 253, 0.12) 28%, rgba(255, 255, 255, 0.78) 58%, #ffffff 100%)',
+                }}
+              />
+              <div
+                className={`pointer-events-none absolute inset-0 ${theme === 'dark' ? 'block' : 'hidden'}`}
+                style={{
+                  background: 'radial-gradient(ellipse at center, rgba(37, 99, 235, 0.34) 0%, rgba(124, 58, 237, 0.22) 24%, rgba(15, 23, 42, 0.96) 52%, #020617 100%)',
                 }}
               />
               <div className="relative z-10 flex w-full max-w-[660px] -translate-y-10 flex-col items-center gap-8 sm:-translate-y-6">
                 <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100">
+                  <div className={`inline-flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
+                    isDarkTheme ? 'bg-slate-900 ring-slate-700' : 'bg-blue-50 ring-blue-100'
+                  }`}>
                     <img
                       src={APP_ICON_URL}
                       alt="PUTRA AI STUDIO"
                       className="h-9 w-9 object-contain"
                     />
                   </div>
-                  <h2 className="text-[28px] font-medium leading-tight tracking-normal text-slate-700 sm:text-4xl">
+                  <h2 className={`text-[28px] font-medium leading-tight tracking-normal sm:text-4xl ${
+                    isDarkTheme ? 'text-slate-100' : 'text-slate-700'
+                  }`}>
                     Sebaiknya kita mulai dari mana?
                   </h2>
                   {username && (
@@ -601,9 +752,10 @@ const App: React.FC = () => {
                     isLoading={isLoading || isTypingResponse || !user}
                     variant="hero"
                     placeholder="Minta PUTRA AI"
+                    theme={theme}
                   />
                   {error && (
-                    <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-sm text-red-100">
+                    <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-sm text-red-600 dark:text-red-100">
                       {error}
                     </div>
                   )}
@@ -625,12 +777,13 @@ const App: React.FC = () => {
                     step={activeThinkingSteps[thinkingStep]}
                     steps={activeThinkingSteps}
                     liveThinking={activeThinkingText}
+                    fallbackLines={activeThinkingFallbackLines}
                   />
                 )
               )}
               
               {error && (
-                <div className="mb-8 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm text-center">
+                <div className="mb-8 rounded-2xl border border-red-100 bg-red-50 p-4 text-center text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
                   {error}
                 </div>
               )}
@@ -643,15 +796,21 @@ const App: React.FC = () => {
 
         {/* Input Area Fixed at Bottom */}
         {activeView === 'chat' && !isEmptyChat && (
-        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 md:px-6">
+        <div
+          className={`absolute bottom-0 left-0 w-full bg-gradient-to-t px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-10 transition-colors md:px-6 ${
+            isDarkTheme
+              ? 'from-slate-950 via-slate-950 to-transparent'
+              : 'from-white via-white to-transparent'
+          }`}
+        >
           <div className="max-w-3xl mx-auto">
-            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isTypingResponse || !user} />
+            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isTypingResponse || !user} theme={theme} />
             <div className="text-center mt-3">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 © 2026 PUTRA AI STUDIO.{' '}
                 <a
                   href="https://www.putraaistudioapikey.site/#privacy"
-                  className="font-medium text-slate-600 underline underline-offset-2 hover:text-blue-600"
+                  className="font-medium text-slate-600 underline underline-offset-2 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
                 >
                   Kebijakan & Privasi
                 </a>

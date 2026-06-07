@@ -260,9 +260,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
       case 'auth/missing-phone-number':
         return 'Nomor telepon wajib diisi.';
       case 'auth/captcha-check-failed':
-        return 'Verifikasi reCAPTCHA gagal. Coba kirim OTP lagi.';
+        return 'Verifikasi keamanan gagal. Coba kirim OTP lagi.';
       case 'auth/invalid-app-credential':
-        return 'Token reCAPTCHA tidak valid atau kedaluwarsa. Centang reCAPTCHA lalu kirim OTP lagi.';
+        return 'Token verifikasi keamanan tidak valid atau kedaluwarsa. Kirim OTP lagi.';
       case 'auth/app-not-authorized':
       case 'auth/unauthorized-domain':
         return 'Domain aplikasi belum diizinkan untuk Firebase Authentication.';
@@ -295,12 +295,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
       }
 
       recaptchaRef.current = new RecaptchaVerifier(auth, container, {
-        size: 'normal',
+        size: 'invisible',
         callback: () => setError(''),
         'expired-callback': () => {
           setRecaptchaReady(false);
           setConfirmation(null);
-          setError('reCAPTCHA kedaluwarsa. Centang ulang lalu kirim OTP lagi.');
+          setError('Verifikasi keamanan kedaluwarsa. Kirim OTP lagi.');
         },
       });
     }
@@ -536,14 +536,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500">
-                        <span>CAPTCHA</span>
-                        {!recaptchaReady && <span>Memuat...</span>}
-                      </div>
-                      <div className="min-h-[78px] overflow-hidden">
-                        <div id="putra-phone-recaptcha" />
-                      </div>
+                    <div className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0">
+                      <div id="putra-phone-recaptcha" />
                     </div>
 
                     <button
@@ -552,7 +546,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onChangeMod
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-70"
                     >
                       <Phone size={18} />
-                      {loading ? 'Mengirim OTP...' : recaptchaReady ? 'Kirim OTP' : 'Menyiapkan CAPTCHA...'}
+                      {loading ? 'Mengirim OTP...' : recaptchaReady ? 'Kirim OTP' : 'Menyiapkan verifikasi...'}
                     </button>
                   </form>
                 </>

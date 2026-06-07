@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Attachment, Message } from '../types';
 import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -632,6 +632,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
   const [typedWordCount, setTypedWordCount] = useState(0);
   const [codePreview, setCodePreview] = useState<{ code: string; language?: string } | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null);
+  const typingCompleteRef = useRef(false);
   const shouldAnimate = isModel && message.animateTyping && message.text;
   const words = useMemo(() => message.text.split(/(\s+)/), [message.text]);
   const renderedText = shouldAnimate ? words.slice(0, typedWordCount).join('') : message.text;
@@ -639,26 +640,35 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
   const isAnimationComplete = !shouldAnimate || typedWordCount >= words.length;
 
   useEffect(() => {
+    typingCompleteRef.current = false;
+    setTypedWordCount(0);
+  }, [message.id, shouldAnimate]);
+
+  useEffect(() => {
     if (!shouldAnimate) {
-      if (isModel) onTypingComplete?.(message.id);
       return;
     }
 
-    setTypedWordCount(0);
     const timer = window.setInterval(() => {
       setTypedWordCount((count) => {
         if (count >= words.length) {
           window.clearInterval(timer);
-          onTypingComplete?.(message.id);
           return count;
         }
 
-        return count + 1;
+        return Math.min(count + 3, words.length);
       });
-    }, 10);
+    }, 14);
 
     return () => window.clearInterval(timer);
   }, [message.id, shouldAnimate, words.length]);
+
+  useEffect(() => {
+    if (!isModel || !shouldAnimate || typingCompleteRef.current || !isAnimationComplete) return;
+
+    typingCompleteRef.current = true;
+    onTypingComplete?.(message.id);
+  }, [isAnimationComplete, isModel, message.id, onTypingComplete, shouldAnimate]);
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.startsWith('image/')) return <ImageIcon size={16} className="text-blue-500" />;
@@ -696,13 +706,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
           {/* Render Text */}
           {message.text && (
             <>
-              <div className="bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-sm">
+              <div className="rounded-3xl rounded-tr-sm bg-[#f0f4f9] px-5 py-3.5 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
                 <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.text}</p>
               </div>
               <CopyButton
                 text={message.text}
                 label="Salin"
-                className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                className="text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               />
             </>
           )}
@@ -734,7 +744,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
 
         {/* Message Content */}
         <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="markdown-body text-[15px] text-slate-800">
+          <div className="markdown-body text-[15px] text-slate-800 dark:text-slate-100">
             <ReactMarkdown
               components={{
                 pre: ({ children }) => <>{children}</>,
@@ -773,7 +783,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
               <CopyButton
                 text={message.text}
                 label="Salin"
-                className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                className="text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               />
               <ReadAloudButton text={message.text} />
               {message.downloadDocx && (

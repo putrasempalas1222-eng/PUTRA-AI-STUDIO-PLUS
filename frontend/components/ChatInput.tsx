@@ -36,6 +36,7 @@ interface ChatInputProps {
   isLoading: boolean;
   variant?: 'default' | 'hero';
   placeholder?: string;
+  theme?: 'light' | 'dark';
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -43,6 +44,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isLoading,
   variant = 'default',
   placeholder = 'Tulis pesan di sini',
+  theme = 'light',
 }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -51,6 +53,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const isHero = variant === 'hero';
+  const isDarkTheme = theme === 'dark';
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -261,9 +264,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className={`relative flex flex-col rounded-[28px] shadow-lg transition-all md:rounded-[32px] ${
-      isHero
-        ? 'bg-white shadow-slate-900/10 ring-1 ring-slate-200/80 focus-within:bg-white focus-within:ring-blue-200'
-        : 'bg-[#f0f4f9] shadow-slate-900/5 focus-within:bg-white focus-within:shadow-[0_8px_24px_rgba(15,23,42,0.08)] focus-within:ring-1 focus-within:ring-gray-200'
+      isDarkTheme
+        ? 'bg-slate-900 shadow-black/20 ring-1 ring-slate-700 focus-within:bg-slate-900 focus-within:ring-blue-500/40'
+        : isHero
+          ? 'bg-white shadow-slate-900/10 ring-1 ring-slate-200/80 focus-within:bg-white focus-within:ring-blue-200'
+          : 'bg-[#f0f4f9] shadow-slate-900/5 focus-within:bg-white focus-within:shadow-[0_8px_24px_rgba(15,23,42,0.08)] focus-within:ring-1 focus-within:ring-gray-200'
     }`}>
       
       {/* Hidden File Inputs */}
@@ -289,15 +294,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div className="flex flex-wrap gap-2 p-3 pb-0">
           {attachments.map(att => (
             <div key={att.id} className={`flex max-w-[200px] items-center gap-2 rounded-xl py-1.5 pl-3 pr-1 shadow-sm ${
-              isHero ? 'border border-slate-200 bg-slate-50' : 'border border-slate-200 bg-white'
+              isDarkTheme ? 'border border-slate-700 bg-slate-800' : isHero ? 'border border-slate-200 bg-slate-50' : 'border border-slate-200 bg-white'
             }`}>
               {getFileIcon(att.mimeType)}
-              <span className={`flex-1 truncate text-xs ${isHero ? 'text-slate-700' : 'text-slate-700'}`}>{att.name}</span>
+              <span className={`flex-1 truncate text-xs ${isDarkTheme ? 'text-slate-200' : 'text-slate-700'}`}>{att.name}</span>
               <button 
                 type="button" 
                 onClick={() => removeAttachment(att.id)}
                 disabled={isLoading}
-                className={`rounded-full p-1 transition-colors ${isHero ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
+                className={`rounded-full p-1 text-slate-400 transition-colors ${isDarkTheme ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
               >
                 <X size={14} />
               </button>
@@ -326,7 +331,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       {(voiceTranscript || interimTranscript) && (
         <div className="px-4 pt-3">
           <div className={`rounded-2xl px-3 py-2 text-sm ${
-            isHero ? 'bg-blue-50 text-slate-700' : 'bg-white text-slate-700'
+            isDarkTheme ? 'bg-slate-800 text-slate-200' : isHero ? 'bg-blue-50 text-slate-700' : 'bg-white text-slate-700'
           }`}>
             <span className="font-medium text-blue-600">Suara:</span>{' '}
             <span>{voiceTranscript}</span>
@@ -344,7 +349,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || isRecording}
             className={`rounded-full p-2 transition-colors disabled:opacity-50 ${
-              isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
+              isDarkTheme ? 'text-slate-300 hover:bg-slate-800' : isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
             }`}
             title="Unggah dokumen (PDF, Word, Excel)"
           >
@@ -355,7 +360,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onClick={() => imageInputRef.current?.click()}
             disabled={isLoading || isRecording}
             className={`rounded-full p-2 transition-colors disabled:opacity-50 ${
-              isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
+              isDarkTheme ? 'text-slate-300 hover:bg-slate-800' : isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
             }`}
             title="Unggah gambar"
           >
@@ -371,7 +376,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={isRecording ? "Sedang merekam..." : placeholder}
           className={`max-h-[200px] min-w-0 flex-1 resize-none border-none bg-transparent px-1.5 py-3 text-[15px] outline-none focus:ring-0 disabled:opacity-50 md:px-2 ${
-            isHero ? 'text-slate-800 placeholder-slate-500' : 'text-slate-800 placeholder-slate-500'
+            isDarkTheme ? 'text-slate-100 placeholder-slate-500' : 'text-slate-800 placeholder-slate-500'
           }`}
           rows={1}
           disabled={isLoading || isRecording}
@@ -396,7 +401,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               onClick={startRecording}
               disabled={isLoading || isRecording}
               className={`rounded-full p-2 transition-colors disabled:opacity-50 ${
-                isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
+                isDarkTheme ? 'text-slate-300 hover:bg-slate-800' : isHero ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-500 hover:bg-slate-200'
               }`}
               title="Gunakan mikrofon"
             >

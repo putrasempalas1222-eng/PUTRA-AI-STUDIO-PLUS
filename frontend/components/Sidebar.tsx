@@ -50,14 +50,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/20 z-20"
+          className="fixed inset-0 z-20 bg-black/20 dark:bg-black/50"
           onClick={onClose}
         />
       )}
 
       {/* Sidebar Container */}
       <div className={`
-        fixed inset-y-0 left-0 z-30 w-[min(86vw,320px)] bg-[#f6f8fc] shadow-2xl shadow-slate-900/15 transform transition-transform duration-300 ease-in-out flex flex-col
+        fixed inset-y-0 left-0 z-30 flex w-[min(86vw,320px)] transform flex-col bg-[#f6f8fc] shadow-2xl shadow-slate-900/15 transition-transform duration-300 ease-in-out dark:bg-slate-950 dark:shadow-black/40
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         
@@ -65,12 +65,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 flex items-center justify-between">
           <button 
             onClick={onNewChat}
-            className="flex items-center gap-2 bg-white hover:bg-slate-100 text-slate-700 px-4 py-2.5 rounded-full text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
           >
             <Plus size={18} />
             Chat baru
           </button>
-          <button onClick={onClose} className="p-2 text-slate-500 hover:bg-slate-200 rounded-full" aria-label="Tutup riwayat chat">
+          <button onClick={onClose} className="rounded-full p-2 text-slate-500 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Tutup riwayat chat">
             <X size={20} />
           </button>
         </div>
@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* History List */}
         <div className="flex-1 overflow-y-auto px-3 py-2">
           <div className="mb-5">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Menu Utama</h3>
+            <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Menu Utama</h3>
             <div className="space-y-1">
               {navLinks.map((item) => {
                 const Icon = item.icon;
@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left text-slate-700 hover:bg-slate-200/70 transition-colors"
+                    className="flex w-full items-center gap-3 rounded-full px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Icon size={16} className="flex-shrink-0 opacity-75" />
                     <span className="text-sm font-medium truncate">{item.label}</span>
@@ -100,8 +100,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenPackages}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                   activeView === 'packages'
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'text-slate-700 hover:bg-slate-200/70'
+                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                    : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
                 <Package size={16} className="flex-shrink-0 opacity-75" />
@@ -111,15 +111,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="mb-5">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Fitur AI</h3>
+            <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Fitur AI</h3>
             <div className="space-y-1">
               <button
                 type="button"
                 onClick={onOpenVoice}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                   activeView === 'voice'
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'text-slate-700 hover:bg-slate-200/70'
+                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                    : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
                 <Mic2 size={16} className="flex-shrink-0 opacity-75" />
@@ -130,8 +130,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenPpt}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                   activeView === 'ppt'
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'text-slate-700 hover:bg-slate-200/70'
+                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                    : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
                 <FileText size={16} className="flex-shrink-0 opacity-75" />
@@ -143,8 +143,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => setIsConvertOpen((value) => !value)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-left transition-colors ${
                     isConvertActive
-                      ? 'bg-blue-100 text-blue-900'
-                      : 'text-slate-700 hover:bg-slate-200/70'
+                      ? 'bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100'
+                      : 'text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
                   <Repeat2 size={16} className="flex-shrink-0 opacity-75" />
