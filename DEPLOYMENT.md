@@ -54,6 +54,47 @@ Secrets ada di:
 C:\3D POSTER\PUTRA AI STUDIO\functions\.env
 ```
 
+Proxy Ollama lokal:
+
+```txt
+Endpoint publik: https://api-mzmdqh3n6a-uc.a.run.app/api/server-lokal/api/chat
+Target backend: OLLAMA_BASE_URL + /api/chat
+Nama service: API-SERVER-LOKAL
+```
+
+Karena Cloud Run/Firebase tidak bisa membaca `http://localhost:11434` dari komputer lokal, `OLLAMA_BASE_URL` harus memakai URL publik seperti ngrok:
+
+```txt
+OLLAMA_BASE_URL="https://rotunda-elderly-alto.ngrok-free.dev"
+OLLAMA_CHAT_URL="https://rotunda-elderly-alto.ngrok-free.dev/api/chat"
+```
+
+Untuk backend lokal yang ingin lewat proxy Cloud Run/Firebase yang sudah dibuat:
+
+```txt
+OLLAMA_BASE_URL="https://api-mzmdqh3n6a-uc.a.run.app/api/server-lokal"
+OLLAMA_CHAT_URL="https://api-mzmdqh3n6a-uc.a.run.app/api/server-lokal/api/chat"
+```
+
+Tes proxy:
+
+```bash
+curl -X POST "https://api-mzmdqh3n6a-uc.a.run.app/api/server-lokal/api/chat" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen2.5-coder:3b\",\"stream\":false,\"messages\":[{\"role\":\"user\",\"content\":\"halo\"}]}"
+```
+
+Jika ingin deploy backend Express sebagai Cloud Run terpisah dengan nama service `api-server-lokal`:
+
+```bash
+cd "C:\3D POSTER\PUTRA AI STUDIO\backend"
+gcloud run deploy api-server-lokal ^
+  --source . ^
+  --region us-central1 ^
+  --allow-unauthenticated ^
+  --set-env-vars OLLAMA_BASE_URL=https://rotunda-elderly-alto.ngrok-free.dev,OLLAMA_CHAT_URL=https://rotunda-elderly-alto.ngrok-free.dev/api/chat,OLLAMA_FIRST=true
+```
+
 ### proxy-api
 
 Source:
