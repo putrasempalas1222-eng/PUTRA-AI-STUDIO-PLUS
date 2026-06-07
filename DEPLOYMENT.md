@@ -81,7 +81,7 @@ Tes proxy:
 ```bash
 curl -X POST "https://api-mzmdqh3n6a-uc.a.run.app/api/server-lokal/api/chat" ^
   -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen2.5-coder:3b\",\"stream\":false,\"messages\":[{\"role\":\"user\",\"content\":\"halo\"}]}"
+  -d "{\"model\":\"gemma3:12b\",\"stream\":false,\"messages\":[{\"role\":\"user\",\"content\":\"halo\"}]}"
 ```
 
 Jika ingin deploy backend Express sebagai Cloud Run terpisah dengan nama service `api-server-lokal`:
