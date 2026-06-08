@@ -19,9 +19,17 @@ const viteEnv = (import.meta as unknown as { env?: Record<string, string | undef
 
 const SERVER_CHAT_PROXY_URL = viteEnv.VITE_CHAT_PROXY_URL || 'https://api-520643585460.us-central1.run.app/api/chat';
 const FALLBACK_CHAT_PROXY_URL = SERVER_CHAT_PROXY_URL;
-const PRIMARY_OLLAMA_CHAT_URL = '';
-const OLLAMA_TEXT_MODEL = '';
-const OLLAMA_VISION_MODEL = '';
+const PRIMARY_OLLAMA_CHAT_URL =
+  viteEnv.VITE_OLLAMA_CHAT_URL ||
+  'https://rotunda-elderly-alto.ngrok-free.dev/api/chat';
+
+const OLLAMA_TEXT_MODEL =
+  viteEnv.VITE_OLLAMA_TEXT_MODEL ||
+  'deepseek-r1:8b';
+
+const OLLAMA_VISION_MODEL =
+  viteEnv.VITE_OLLAMA_VISION_MODEL ||
+  'gemma3:4b';
 const MAX_OLLAMA_IMAGE_BYTES = 3 * 1024 * 1024;
 const SUPPORTED_OLLAMA_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
