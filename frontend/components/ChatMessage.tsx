@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Attachment, Message } from '../types';
-import { Check, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Copy, Download, ExternalLink, FileText, Image as ImageIcon, Music, File, Play, Volume2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { downloadDocx } from '../services/docx';
 
@@ -439,7 +439,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, onRunCode }) => (
         />
       </div>
     </div>
-    <pre className="m-0 max-h-none overflow-x-auto whitespace-pre bg-transparent p-4 text-sm leading-relaxed">
+    <pre className="m-0 max-h-none overflow-x-auto whitespace-pre bg-transparent p-4 text-sm leading-relaxed" style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
       <code>{code}</code>
     </pre>
   </div>
@@ -634,6 +634,33 @@ const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachm
   );
 };
 
+const ThinkingBlock: React.FC<{ thinking: string }> = ({ thinking }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const text = thinking?.trim();
+  if (!text) return null;
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setIsOpen((o) => !o)}
+        className="inline-flex items-center gap-1.5 px-0 py-1 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+        aria-expanded={isOpen}
+      >
+        {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        Thinking
+      </button>
+      {isOpen && (
+        <div className="mt-2 pl-1">
+          <pre className="whitespace-pre-wrap font-mono text-[12px] leading-[1.8] text-slate-400 dark:text-slate-500">
+            {text}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingComplete }) => {
   const isModel = message.role === 'model';
   const [typedWordCount, setTypedWordCount] = useState(0);
@@ -752,6 +779,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
 
         {/* Message Content */}
         <div className="min-w-0 flex-1 overflow-hidden pt-[5px]">
+          {message.thinking && <ThinkingBlock thinking={message.thinking} />}
           <div className="markdown-body text-[15px] text-slate-800 dark:text-slate-100">
             <ReactMarkdown
               components={{

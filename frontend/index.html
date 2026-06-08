@@ -56,7 +56,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     html,
     body,
@@ -72,7 +72,7 @@
     body {
       position: fixed;
       inset: 0;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
       margin: 0;
     }
 
@@ -88,6 +88,22 @@
     /* Custom scrollbar for a cleaner look */
     ::-webkit-scrollbar {
       width: 8px;
+    }
+
+    /* Typography fine-tuning for Plus Jakarta Sans */
+    body {
+      font-feature-settings: 'cv08', 'cv10';
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.01em;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      letter-spacing: -0.02em;
+    }
+
+    input, textarea, select, button {
+      font-family: inherit;
     }
 
     ::-webkit-scrollbar-track {
@@ -163,7 +179,7 @@
       padding: 0.2em 0.4em;
       border-radius: 0.25em;
       font-size: 0.9em;
-      font-family: monospace;
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     .dark .markdown-body code {

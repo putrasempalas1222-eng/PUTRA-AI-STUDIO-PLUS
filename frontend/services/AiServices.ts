@@ -479,21 +479,75 @@ class PutraAiService {
       }),
     });
 
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
       throw new Error(data?.message || data?.error || `Fallback API gagal: ${response.status}`);
     }
 
-    const reply = sanitizeModelIdentity(data?.text || data?.content || extractFallbackText(data));
-    if (!reply) {
-      throw new Error('Fallback API tidak mengirim balasan.');
+    const contentType = response.headers.get('content-type') || '';
+
+    // === SSE streaming path ===
+    if (contentType.includes('text/event-stream')) {
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let pending = '';
+      let fullThinking = '';
+      let fullContent = '';
+      let finalText = '';
+      let finalMode = hasImage ? 'vision' : 'text';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true });
+        const lines = pending.split('\n');
+        pending = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+          let parsed: { type: string; data: any };
+          try { parsed = JSON.parse(raw); } catch { continue; }
+
+          if (parsed.type === 'thinking') {
+            fullThinking += parsed.data;
+            requestOptions.onThinking?.(fullThinking);
+          } else if (parsed.type === 'content') {
+            // Backend sends full accumulated content each time — use directly, no re-accumulation
+            fullContent = parsed.data;
+            requestOptions.onContent?.(sanitizeModelIdentity(fullContent));
+          } else if (parsed.type === 'done') {
+            finalText = parsed.data?.text || fullContent;
+            finalMode = parsed.data?.mode || finalMode;
+          } else if (parsed.type === 'error') {
+            throw new Error(parsed.data?.message || 'Stream error');
+          }
+        }
+      }
+
+      const text = sanitizeModelIdentity(finalText || fullContent);
+      if (!text) throw new Error('Fallback API tidak mengirim balasan.');
+      return { text, thinking: fullThinking, mode: finalMode };
     }
 
-    return {
-      text: reply,
-      thinking: '',
-      mode: hasImage ? 'vision' : 'text',
-    };
+    // === Non-streaming JSON path (image, file, greeting, image gen) ===
+    const data = await response.json().catch(() => ({}));
+    const rawReply = sanitizeModelIdentity(data?.text || data?.content || extractFallbackText(data));
+    if (!rawReply) throw new Error('Fallback API tidak mengirim balasan.');
+
+    let thinking = normalizeWhitespace(data?.thinking || '');
+    let text = rawReply;
+
+    if (!thinking) {
+      const parsed = splitAiThinking(rawReply);
+      thinking = parsed.thinking;
+      text = parsed.text || rawReply;
+    } else {
+      text = normalizeWhitespace(rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim());
+    }
+
+    return { text: sanitizeModelIdentity(text), thinking, mode: hasImage ? 'vision' : 'text' };
   }
 
   public async sendMessage(

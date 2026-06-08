@@ -1098,12 +1098,12 @@ const App: React.FC = () => {
         onContent: (content) => {
           if (isVisionRequest) return;
 
-          const cleanContent = content.trim();
-          if (!cleanContent) return;
+          const cleanContent = content.replace(/^\n+/, ''); // only strip leading newlines, preserve internal formatting
+          if (!cleanContent.trim()) return;
 
           hasStreamingContent = true;
           latestStreamText = cleanContent;
-          setActiveThinkingText('');
+          // Keep thinking visible until streaming starts - clear after first content token
           setIsLoading(false);
           setIsTypingResponse(false);
           setMessages((currentMessages) => {
