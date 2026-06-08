@@ -17,7 +17,7 @@ interface SendMessageCallbacks {
 
 const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-const SERVER_CHAT_PROXY_URL = viteEnv.VITE_CHAT_PROXY_URL || '/api/chat';
+const SERVER_CHAT_PROXY_URL = viteEnv.VITE_CHAT_PROXY_URL || 'https://api-520643585460.us-central1.run.app/api/chat';
 const FALLBACK_CHAT_PROXY_URL = SERVER_CHAT_PROXY_URL;
 const PRIMARY_OLLAMA_CHAT_URL = '';
 const OLLAMA_TEXT_MODEL = '';
