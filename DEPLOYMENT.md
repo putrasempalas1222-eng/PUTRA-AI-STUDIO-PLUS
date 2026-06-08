@@ -39,7 +39,7 @@ https://api-mzmdqh3n6a-uc.a.run.app
 Deploy commands:
 
 ```bash
-cd "C:\3D POSTER\PUTRA AI STUDIO"
+cd "D:\3D POSTER\PUTRA AI STUDIO"
 firebase login
 firebase use play-integrity-2adpr7x4a8xhyex
 cd functions
