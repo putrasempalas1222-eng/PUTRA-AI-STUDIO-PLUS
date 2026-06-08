@@ -21,16 +21,26 @@ const THINKING_STEPS = [
 
 const FALLBACK_THINKING_LINES = [
   'Connecting to PUTRA AI STUDIO...',
-  'Understanding the request...',
-  'Checking conversation context...',
-  'Preparing the best answer...',
+  'Reading the question carefully...',
+  'Searching through knowledge base...',
+  'Cross-referencing information...',
+  'Evaluating possible answers...',
+  'Filtering the best response...',
+  'Structuring the reply...',
+  'Almost ready...',
 ];
 
 const INDONESIAN_THINKING_LINES = [
-  'Menghubungkan ke PUTRA AI STUDIO...',
-  'Membaca maksud pertanyaan...',
-  'Menimbang konteks percakapan...',
-  'Menyusun jawaban terbaik...',
+  'Menghubungkan ke server PUTRA AI PLUS...',
+  'Membaca pertanyaanmu dengan teliti...',
+  'Menelusuri basis pengetahuan...',
+  'Mencari informasi yang relevan...',
+  'Mempertimbangkan berbagai kemungkinan...',
+  'Menyaring jawaban terbaik...',
+  'Mencocokkan konteks percakapan...',
+  'Merangkai kalimat yang tepat...',
+  'Memverifikasi akurasi jawaban...',
+  'Hampir selesai...',
 ];
 
 const IMAGE_GENERATION_STEPS = [
@@ -635,83 +645,118 @@ const ReauthDeviceModal: React.FC<{
 
 const ThinkingLoader: React.FC<{ step: string; steps: string[]; liveThinking?: string; fallbackLines?: string[] }> = ({ step, steps, liveThinking, fallbackLines = FALLBACK_THINKING_LINES }) => {
   const [isOpen, setIsOpen] = useState(true);
-  const [typedText, setTypedText] = useState('');
   const [fallbackIndex, setFallbackIndex] = useState(0);
+  const [displayLine, setDisplayLine] = useState(fallbackLines[0]);
+  const [lineVisible, setLineVisible] = useState(true);
+  const [titleDots, setTitleDots] = useState('.');
+  const [typedLive, setTypedLive] = useState('');
+
   const title = steps === IMAGE_ANALYSIS_STEPS
     ? 'Menganalisis gambar'
     : steps === FILE_ANALYSIS_STEPS
       ? 'Menganalisis file'
-      : 'Thinking...';
+      : 'Thinking';
 
   const hasLiveThinking = Boolean(liveThinking?.trim());
-  const detailText = hasLiveThinking ? liveThinking!.trim() : fallbackLines[fallbackIndex];
 
+  // Animated dots: "." → ".." → "..."
+  useEffect(() => {
+    const seq = ['.', '..', '...', '..'];
+    let i = 0;
+    const t = window.setInterval(() => {
+      i = (i + 1) % seq.length;
+      setTitleDots(seq[i]);
+    }, 350);
+    return () => window.clearInterval(t);
+  }, []);
+
+  // Sync fallbackLines[0] if language switches
+  useEffect(() => {
+    setFallbackIndex(0);
+    setDisplayLine(fallbackLines[0]);
+    setLineVisible(true);
+  }, [fallbackLines]);
+
+  // Cycle fallback lines with fade-out → swap → fade-in
   useEffect(() => {
     if (hasLiveThinking) return;
 
-    const timer = window.setInterval(() => {
-      setFallbackIndex((index) => (index + 1) % fallbackLines.length);
-    }, 450);
+    const cycle = window.setInterval(() => {
+      setLineVisible(false);
+      window.setTimeout(() => {
+        setFallbackIndex((idx) => {
+          const next = (idx + 1) % fallbackLines.length;
+          setDisplayLine(fallbackLines[next]);
+          return next;
+        });
+        setLineVisible(true);
+      }, 280);
+    }, 2200);
 
-    return () => window.clearInterval(timer);
-  }, [fallbackLines.length, hasLiveThinking]);
+    return () => window.clearInterval(cycle);
+  }, [fallbackLines, hasLiveThinking]);
 
+  // Stream live thinking text
   useEffect(() => {
-    if (!isOpen) return;
+    if (!hasLiveThinking) { setTypedLive(''); return; }
+    const target = liveThinking!.trim();
+    if (!target.startsWith(typedLive)) { setTypedLive(''); return; }
+    if (typedLive.length >= target.length) return;
+    let i = typedLive.length;
+    const t = window.setInterval(() => {
+      i = Math.min(i + 4, target.length);
+      setTypedLive(target.slice(0, i));
+      if (i >= target.length) window.clearInterval(t);
+    }, 12);
+    return () => window.clearInterval(t);
+  }, [liveThinking, hasLiveThinking, typedLive]);
 
-    if (hasLiveThinking) {
-      setTypedText(detailText);
-      return;
-    }
-
-    if (!detailText.startsWith(typedText)) {
-      setTypedText('');
-      return;
-    }
-
-    let index = typedText.length;
-    const timer = window.setInterval(() => {
-      index += 1;
-      setTypedText(detailText.slice(0, index));
-
-      if (index >= detailText.length) {
-        window.clearInterval(timer);
-      }
-    }, 8);
-
-    return () => window.clearInterval(timer);
-  }, [detailText, hasLiveThinking, isOpen, typedText]);
+  const shownText = hasLiveThinking ? typedLive : displayLine;
 
   return (
     <div className="flex w-full mb-8 justify-start">
       <div className="flex max-w-[90%] flex-row items-start gap-4">
-        <div className="flex-shrink-0 mt-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
-            <img
-              src={APP_ICON_URL}
-              alt="PUTRA AI STUDIO"
-              className="h-6 w-6 object-contain"
-            />
+        {/* Avatar with pulsing ring */}
+        <div className="relative flex-shrink-0 mt-1">
+          <span className="absolute inset-0 rounded-full bg-blue-400/20 animate-ping" style={{ animationDuration: '1.6s' }} />
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
+            <img src={APP_ICON_URL} alt="PUTRA AI STUDIO" className="h-6 w-6 object-contain" />
           </div>
         </div>
+
         <div className="min-w-0 pt-1">
+          {/* Title */}
           <button
             type="button"
-            onClick={() => setIsOpen((open) => !open)}
-            className="inline-flex text-left text-sm font-medium text-slate-500 transition-colors hover:text-blue-600 focus:outline-none focus-visible:underline dark:text-slate-400 dark:hover:text-blue-300"
-            title={isOpen ? 'Sembunyikan isi pikiran AI' : 'Tampilkan isi pikiran AI'}
+            onClick={() => setIsOpen((o) => !o)}
+            className="inline-flex items-center gap-0 text-left text-sm font-semibold text-slate-600 transition-colors hover:text-blue-600 focus:outline-none dark:text-slate-300 dark:hover:text-blue-300"
             aria-expanded={isOpen}
           >
-            {title}
+            <span>{title}</span>
+            <span className="w-7 text-left text-blue-500 tabular-nums">{titleDots}</span>
           </button>
+
+          {/* Cycling status line */}
           {isOpen && (
-            <p className="mt-1 min-h-5 max-w-3xl text-[13px] font-normal leading-6 text-slate-500/85 dark:text-slate-400/85">
-              {typedText}
-              <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-slate-400 dark:bg-slate-500" />
-            </p>
+            <div className="mt-1 overflow-hidden">
+              <p
+                className="text-[13px] leading-6 text-slate-400 dark:text-slate-500 transition-all duration-300 whitespace-normal break-words max-w-xl"
+                style={{
+                  opacity: lineVisible ? 1 : 0,
+                  transform: lineVisible ? 'translateY(0px)' : 'translateY(-5px)',
+                }}
+              >
+                {shownText}
+                <span
+                  className="ml-0.5 inline-block w-[2px] h-[13px] translate-y-[2px] rounded-sm bg-blue-400 dark:bg-blue-500"
+                  style={{ animation: 'thinking-blink 0.75s step-start infinite' }}
+                />
+              </p>
+            </div>
           )}
         </div>
       </div>
+      <style>{`@keyframes thinking-blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
     </div>
   );
 };

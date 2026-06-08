@@ -664,6 +664,7 @@ const ThinkingBlock: React.FC<{ thinking: string }> = ({ thinking }) => {
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingComplete }) => {
   const isModel = message.role === 'model';
   const [typedWordCount, setTypedWordCount] = useState(0);
+  const [isJustAppeared, setIsJustAppeared] = useState(false);
   const [codePreview, setCodePreview] = useState<{ code: string; language?: string } | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null);
   const typingCompleteRef = useRef(false);
@@ -673,6 +674,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
   const renderedMarkdown = useMemo(() => linkifyBareUrls(renderedText), [renderedText]);
   const isAnimationComplete = !shouldAnimate || typedWordCount >= words.length;
   const canShowModelActions = isAnimationComplete && !message.isStreaming;
+
+  // Trigger entrance animation whenever a new model message appears
+  useEffect(() => {
+    if (!isModel) return;
+    setIsJustAppeared(true);
+    const t = window.setTimeout(() => setIsJustAppeared(false), 600);
+    return () => window.clearTimeout(t);
+  }, [message.id, isModel]);
 
   useEffect(() => {
     typingCompleteRef.current = false;
@@ -764,11 +773,21 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
 
   // Model Message - Left aligned, no bubble, with assistant icon
   return (
-    <div className="flex w-full mb-8 justify-start">
+    <div
+      className="flex w-full mb-8 justify-start"
+      style={{
+        animation: isJustAppeared ? 'ai-message-in 0.45s cubic-bezier(0.22,1,0.36,1) both' : undefined,
+      }}
+    >
       <div className="flex max-w-full md:max-w-[90%] flex-row items-start gap-4">
         {/* Assistant icon */}
         <div className="flex-shrink-0 pt-[2px]">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 shadow-sm ring-1 ring-blue-100"
+            style={{
+              animation: isJustAppeared ? 'ai-icon-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) both' : undefined,
+            }}
+          >
             <img
               src={APP_ICON_URL}
               alt="PUTRA AI STUDIO"
@@ -780,7 +799,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
         {/* Message Content */}
         <div className="min-w-0 flex-1 overflow-hidden pt-[5px]">
           {message.thinking && <ThinkingBlock thinking={message.thinking} />}
-          <div className="markdown-body text-[15px] text-slate-800 dark:text-slate-100">
+          <div
+            className="markdown-body text-[15px] text-slate-800 dark:text-slate-100"
+            style={{
+              animation: isJustAppeared ? 'ai-content-in 0.5s cubic-bezier(0.22,1,0.36,1) 0.05s both' : undefined,
+            }}
+          >
             <ReactMarkdown
               components={{
                 pre: ({ children }) => <>{children}</>,
@@ -825,7 +849,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
             </button>
           )}
           {canShowModelActions && (
-            <div className="mt-3 flex flex-wrap justify-start gap-2">
+            <div
+              className="mt-3 flex flex-wrap justify-start gap-2"
+              style={{ animation: 'ai-actions-in 0.35s ease both' }}
+            >
               <CopyButton
                 text={message.text}
                 label="Salin"
@@ -878,6 +905,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onTypingCompl
           </div>
         </div>
       )}
+      {/* Keyframes for AI message entrance */}
+      <style>{`
+        @keyframes ai-message-in {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ai-icon-pop {
+          from { opacity: 0; transform: scale(0.6); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes ai-content-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ai-actions-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };
